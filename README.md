@@ -109,8 +109,14 @@ header `Authorization: Bearer <KEEL_TOKEN>`.
 ## In-app assistant
 
 Set `ANTHROPIC_API_KEY` (and optionally `KEEL_MODEL`, default `claude-sonnet-5-5`).
-The Assistant tab streams replies and shows each tool call. Conversations are stored
-locally in SQLite. Your financial data goes to Anthropic's API when you use it.
+The assistant is Keel's front door: it is the home screen, and `⌘J` docks it beside any
+other screen so you can ask about what you're looking at ("why is this one unreviewed?").
+Replies stream, every tool call shows as a card that opens the screen holding that data,
+and answers link straight into Transactions, Categories and the rest. It uses the same
+tool registry as `/mcp`, so anything Claude can do over MCP it can do here, including
+categorizing, reviewing, splitting and budgeting. Conversations are stored locally in
+SQLite (Settings → Assistant → Clear conversations). Your financial data goes to
+Anthropic's API when you use it.
 
 ## Run at login (launchd)
 
@@ -155,5 +161,5 @@ Screens follow the *Keel* design system (`design/`; see CLAUDE.md): light-first 
 full dark theme, figures in IBM Plex Mono, green = income/up, red = over/down, amber =
 attention. Build order and per-screen specs are in `docs/screens/`.
 
-Keyboard: `⌘K` search · `⌘1…9` screens · in Transactions `↑/↓` move, `R` review, `E`
+Keyboard: `⌘K` search · `⌘J` ask Keel · `⌘1…9` screens · in Transactions `↑/↓` move, `R` review, `E`
 category, `F` filter, `/` search, `⌘A` select all, `Esc` clear/close.

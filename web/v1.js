@@ -54,7 +54,7 @@ function budgetRow(b) {
 
 // ---------- screens ----------
 export const screens = {
-  async '/'() {
+  async '/dashboard'() {
     const [o, daily, unusual, txs] = await Promise.all([api('/overview'), api('/spending/daily'), api('/spending/unusual'), api('/transactions?limit=8')]);
     const m = o.month, nw = o.net_worth;
     const b = o.budgets;
@@ -145,54 +145,6 @@ export const screens = {
       </tbody></table></div>`;
   },
 
-  async '/assistant'() {
-    const conv = 'default';
-    const history = await api('/chat/' + conv);
-    const el = h(`<div class="chat">
-      <div class="screen-head"><div></div><div class="actions"><button class="btn ghost" id="clear">New chat</button></div></div>
-      <div class="log" id="log"></div>
-      <div class="suggest" id="suggest">${['How am I doing this month?', 'What looks unusual?', 'Which budgets will I blow?', 'What subscriptions can I cut?', 'Review my unreviewed transactions'].map((s) => `<button class="btn">${s}</button>`).join('')}</div>
-      <form class="composer" id="composer"><textarea class="input" id="msg" rows="1" placeholder="Ask about your money…"></textarea><button class="btn primary" type="submit">Send</button></form>
-    </div>`);
-    const log = $('#log', el);
-    const addMsg = (role, text) => { const m = h(`<div class="msg ${role}"></div>`); if (role === 'assistant') m.innerHTML = md(text); else m.textContent = text; log.append(m); log.scrollTop = log.scrollHeight; return m; };
-    for (const m of history) {
-      if (typeof m.content === 'string') addMsg(m.role, m.content);
-      else for (const b of m.content) { if (b.type === 'text' && b.text.trim()) addMsg(m.role, b.text); else if (b.type === 'tool_use') log.append(h(`<div class="toolcall">⚙ ${esc(b.name)}</div>`)); }
-    }
-    log.scrollTop = log.scrollHeight;
-    async function send(text) {
-      if (!text.trim()) return;
-      $('#suggest', el).style.display = 'none';
-      addMsg('user', text);
-      $('#msg', el).value = '';
-      let cur = null, buf = '';
-      const res = await fetch('/api/assistant', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ conversation_id: conv, message: text }) });
-      const reader = res.body.getReader();
-      const dec = new TextDecoder();
-      let carry = '';
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        carry += dec.decode(value, { stream: true });
-        const parts = carry.split('\n\n'); carry = parts.pop();
-        for (const p of parts) {
-          if (!p.startsWith('data: ')) continue;
-          const ev = JSON.parse(p.slice(6));
-          if (ev.type === 'text') { if (!cur) { cur = addMsg('assistant', ''); buf = ''; } buf += ev.text; cur.innerHTML = md(buf); log.scrollTop = log.scrollHeight; }
-          else if (ev.type === 'tool') { cur = null; log.append(h(`<div class="toolcall">⚙ ${esc(ev.name)} ${esc(JSON.stringify(ev.input))}</div>`)); log.scrollTop = log.scrollHeight; }
-          else if (ev.type === 'error') { addMsg('assistant', '⚠ ' + ev.message); }
-        }
-      }
-      refreshChrome();
-    }
-    $('#composer', el).addEventListener('submit', (e) => { e.preventDefault(); send($('#msg', el).value); });
-    $('#msg', el).addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(e.target.value); } });
-    el.querySelectorAll('#suggest button').forEach((b) => b.addEventListener('click', () => send(b.textContent)));
-    $('#clear', el).addEventListener('click', async () => { await api('/chat/' + conv, { method: 'DELETE' }); log.innerHTML = ''; $('#suggest', el).style.display = ''; });
-    return el;
-  },
-
   async '/settings'() {
     const s = await api('/status');
     const origin = location.origin;
@@ -206,7 +158,8 @@ export const screens = {
           <div style="margin-top:16px"><label class="label">Import Copilot CSV export</label><input type="file" id="csv" accept=".csv,text/csv" class="input" style="margin-top:6px"></div></div>
         <div class="card col-6"><div class="card-head"><h2 class="h2">Assistant</h2><span class="chip ${s.assistant.configured ? 'brand' : 'amber'}">${s.assistant.configured ? 'ready' : 'no API key'}</span></div>
           <dl class="kv"><dt>Model</dt><dd>${esc(s.assistant.model)}</dd><dt>Tools</dt><dd>${s.mcp.tools.length}</dd></dl>
-          <p class="body-sm muted" style="margin-top:12px">Set <code>ANTHROPIC_API_KEY</code> in <code>.env</code> and restart to enable the in-app assistant.</p>
+          <p class="body-sm muted" style="margin-top:12px">${s.assistant.configured ? 'Conversations are stored locally in SQLite.' : 'Set <code>ANTHROPIC_API_KEY</code> in <code>.env</code> and restart to enable the in-app assistant.'}</p>
+          <div style="margin-top:12px"><button class="btn" id="clear-chats">Clear conversations</button></div>
           <div class="toggle" style="margin-top:12px"><span>Light theme</span><button class="switch ${theme === 'light' ? 'on' : ''}" id="theme" aria-label="Toggle theme"></button></div></div>
         <div class="card col-12"><div class="card-head"><h2 class="h2">Connect Claude to Keel (MCP)</h2></div>
           <p class="body-sm muted">Keel serves the same ${s.mcp.tools.length} tools over MCP, so Claude Desktop, Claude Code and claude.ai can read and edit your finances.</p>
@@ -217,6 +170,7 @@ export const screens = {
       </div></div>`);
     $('#sync', el).addEventListener('click', async (e) => { e.target.disabled = true; e.target.textContent = 'Syncing…'; try { const r = await api('/sync', { method: 'POST' }); toast(`Synced: ${Object.entries(r.counts).map(([k, v]) => `${v} ${k}`).join(', ')}`); if (r.warnings.length) alert('Sync warnings:\n' + r.warnings.join('\n')); e.target.disabled = false; e.target.textContent = 'Sync from Copilot'; refreshChrome(); navigate(); } catch (err) { alert('Sync failed: ' + err.message); e.target.disabled = false; e.target.textContent = 'Sync from Copilot'; } });
     $('#csv', el).addEventListener('change', async (e) => { const f = e.target.files[0]; if (!f) return; const fd = new FormData(); fd.append('file', f); try { const r = await api('/import/csv', { method: 'POST', body: fd, headers: {} }); toast(`Imported ${r.imported} rows (${r.skipped} skipped)`); refreshChrome(); navigate(); } catch (err) { alert('Import failed: ' + err.message); } });
+    $('#clear-chats', el).addEventListener('click', async (e) => { if (!confirm('Delete every assistant conversation?')) return; try { const r = await api('/chat', { method: 'DELETE' }); toast(`Deleted ${r.deleted} messages`); store.set('keel-conv', null); navigate(); } catch (err) { alert(err.message); } });
     $('#theme', el).addEventListener('click', (e) => { const next = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light'; document.documentElement.dataset.theme = next; store.set('keel-theme', next); e.target.classList.toggle('on', next === 'light'); });
     return el;
   },
@@ -250,22 +204,3 @@ function openBudgetSheet(item, cats) {
     try { const r = await api('/budgets/' + encodeURIComponent(catId), { method: 'PUT', body: { amount } }); toast(r.copilot?.pushed ? 'Budget saved and pushed to Copilot' : 'Budget saved locally'); s.close(); navigate(); } catch (e) { alert(e.message); }
   });
 }
-
-// ---------- markdown-lite for assistant replies ----------
-function md(text) {
-  const lines = esc(text).split('\n');
-  let out = '', inTable = false, inList = false;
-  const inline = (s) => s.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>').replace(/`([^`]+)`/g, '<code>$1</code>').replace(/(?<!\*)\*(?!\*)([^*]+)\*(?!\*)/g, '<em>$1</em>');
-  for (const l of lines) {
-    if (/^\s*\|/.test(l)) { if (/^\s*\|[\s:-]+\|/.test(l)) continue; const cells = l.trim().replace(/^\||\|$/g, '').split('|').map((c) => c.trim()); if (!inTable) { out += '<table>'; inTable = true; out += '<tr>' + cells.map((c) => `<th>${inline(c)}</th>`).join('') + '</tr>'; } else out += '<tr>' + cells.map((c) => `<td>${inline(c)}</td>`).join('') + '</tr>'; continue; }
-    if (inTable) { out += '</table>'; inTable = false; }
-    if (/^\s*[-*•]\s+/.test(l)) { if (!inList) { out += '<ul style="margin:4px 0 8px 18px;padding:0">'; inList = true; } out += `<li>${inline(l.replace(/^\s*[-*•]\s+/, ''))}</li>`; continue; }
-    if (inList) { out += '</ul>'; inList = false; }
-    if (/^#{1,3}\s/.test(l)) { out += `<p><strong>${inline(l.replace(/^#+\s/, ''))}</strong></p>`; continue; }
-    if (l.trim() === '') continue;
-    out += `<p>${inline(l)}</p>`;
-  }
-  if (inTable) out += '</table>'; if (inList) out += '</ul>';
-  return out;
-}
-

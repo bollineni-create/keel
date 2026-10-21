@@ -11,11 +11,13 @@ interactions, and acceptance checks. Wireframes drawn from the tokens are in
 
 1. ✅ **Shell** — three-pane layout, sidebar (nav + MY ACCOUNTS + footer), title bars,
    phone tab bar + detail sheet. Everything else slots into it.
+   ✅ **Assistant** — the front door: home route, conversation rail, tool cards, and the
+   `⌘J` dock on every other screen. Same tool registry as `/mcp`.
 2. ✅ **Transactions** — the densest screen; builds TransactionRow, CategoryTag, Filter/Sort
    popovers, detail pane, bulk bar. Reused by Accounts and Recurrings detail panes.
 3. **Dashboard** — composes cards from the other screens' read models.
 4. **Accounts** → **Categories** → **Recurrings** → **Investments** → **Cash flow** → **Goals**.
-5. **Settings** sheet, **Assistant** (already built; restyle to the shell).
+5. **Settings** sheet.
 
 Screens without a ✅ still render their v1 version (`web/v1.js`) inside the shell's main pane.
 
@@ -32,5 +34,5 @@ Screens without a ✅ still render their v1 version (`web/v1.js`) inside the she
 - Amount convention: positive = money out. Display flips the sign for income rows
   (`+$3,063.48`, `positive`).
 - Loading: skeleton blocks on `bg-200` matching the card's final height (no spinners).
-- Keyboard: `⌘K` search, `⌘1…8` nav, `↑/↓` move selection in the focused list,
+- Keyboard: `⌘K` search, `⌘J` assistant dock, `⌘1…9` nav, `↑/↓` move selection in the focused list,
   `Enter` opens detail, `Esc` closes sheet/popover.

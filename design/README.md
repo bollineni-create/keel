@@ -100,3 +100,11 @@ the person chose one in the source app.
 
 Short, specific, no exclamation marks. The assistant says what it did and what the
 number means: "You've spent $1,240 of $1,500 on dining — 83%, with 11 days left."
+
+## Code
+
+The app lives at https://github.com/bollineni-create/keel. `design/tokens.json` in the
+repo is a verbatim copy of this system's `tokens.json`; `npm run tokens` generates
+`web/tokens.css` from it, and `web/styles.css` uses only those variables. To change the
+design: edit this system here, then copy `tokens.json` and this README into the repo's
+`design/` folder and run `npm run tokens` (the repo's CLAUDE.md spells out the steps).

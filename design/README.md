@@ -84,10 +84,11 @@ Investments `trending-up` · Categories `tags` · Recurrings `repeat` · Setting
 the institution logo when the data has one, else the first letter on `bg-300`. Category
 emoji come from the data and are never replaced.
 
-**App icon.** An open daybook with two short entries on its right page: the ledger, kept
-daily. Drawn in rounded 4.5/64 strokes; `brand-ink` on `brand` (dark `#3ccf9a`) inside a
-`#0d1014` rounded square for the PWA, white on light `brand` for the Mac app. The master is
-`web/icon.svg` in the repo; `app/macos/make_icon.swift` redraws the same mark for macOS.
+**App icon.** A solid white **D** on `brand`, with two short rounded lines cut out of it: a
+daybook's first entries. One flat shape, no outlines or frames. It always uses light-theme
+`brand` (`#117a58`), in both themes, because dark `brand` is too pale behind white. The Mac app
+draws the same mark in the macOS squircle. The master is `web/icon.svg` in the repo;
+`app/macos/make_icon.swift` redraws it for macOS.
 (The app was called Keel until October 2026.)
 
 ## Components

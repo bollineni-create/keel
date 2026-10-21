@@ -1,4 +1,4 @@
-// Draws Daybook's app icon (the open-book mark from web/icon.svg on a macOS-style rounded square) as a 1024px PNG.
+// Draws Daybook's app icon (the D mark from web/icon.svg on a macOS-style rounded square) as a 1024px PNG.
 // Run by build.sh: swift make_icon.swift <out.png>
 import AppKit
 
@@ -20,31 +20,26 @@ ctx.setShadow(offset: CGSize(width: 0, height: -14), blur: 30, color: NSColor.bl
 brand.setFill(); shape.fill()
 ctx.restoreGState()
 
-// The mark (an open daybook with two entries on its right page) from web/icon.svg, where the square spans
-// 8…56 of a 64-unit box. Here it's in a 24-unit space whose square spans 2…22, mapped onto `body`.
-let unit = body.width / 20
-func pt(_ x: CGFloat, _ y: CGFloat) -> NSPoint { NSPoint(x: inset + (x - 2) * unit, y: S - inset - (y - 2) * unit) }
-let book = NSBezierPath()
-book.move(to: pt(12.0, 8.458))                                                                         // spine, top
-book.curve(to: pt(5.958, 7.417), controlPoint1: pt(10.333, 7.208), controlPoint2: pt(8.042, 7.0))      // left page, top edge
-book.line(to: pt(5.958, 15.958))
-book.curve(to: pt(12.0, 17.0), controlPoint1: pt(8.042, 15.542), controlPoint2: pt(10.333, 15.75))   // left page, bottom edge
-book.curve(to: pt(18.042, 15.958), controlPoint1: pt(13.667, 15.75), controlPoint2: pt(15.958, 15.542))
-book.line(to: pt(18.042, 7.417))                                                                     // right page
-book.curve(to: pt(12.0, 8.458), controlPoint1: pt(15.958, 7.0), controlPoint2: pt(13.667, 7.208))
-book.close()
-book.move(to: pt(12.0, 8.458)); book.line(to: pt(12.0, 17.0))                                          // spine
-book.lineWidth = 1.875 * unit
-book.lineCapStyle = .round
-book.lineJoinStyle = .round
-let entries = NSBezierPath()
-entries.move(to: pt(14.292, 10.958)); entries.line(to: pt(15.958, 10.958))
-entries.move(to: pt(14.292, 13.25)); entries.line(to: pt(15.958, 13.25))
-entries.lineWidth = 1.25 * unit
-entries.lineCapStyle = .round
-NSColor.white.setStroke()
-book.stroke()
-entries.stroke()
+// The mark from web/icon.svg (a D whose two cut-out lines are a daybook's first entries), drawn in that
+// file's 64-unit box, which maps onto `body`.
+let k = body.width / 64
+func pt(_ x: CGFloat, _ y: CGFloat) -> NSPoint { NSPoint(x: inset + x * k, y: S - inset - y * k) }
+let mark = NSBezierPath()
+mark.windingRule = .evenOdd
+mark.move(to: pt(19, 14))
+mark.line(to: pt(31, 14))
+mark.appendArc(withCenter: pt(31, 32), radius: 18 * k, startAngle: 90, endAngle: -90, clockwise: true)   // the D's bowl
+mark.line(to: pt(19, 50))
+mark.appendArc(withCenter: pt(19, 47), radius: 3 * k, startAngle: -90, endAngle: 180, clockwise: true)
+mark.line(to: pt(16, 17))
+mark.appendArc(withCenter: pt(19, 17), radius: 3 * k, startAngle: 180, endAngle: 90, clockwise: true)
+mark.close()
+for (x, y, w) in [(23.0, 25.0, 17.0), (23.0, 34.0, 11.0)] {                                                 // the two entries
+    let r = NSRect(origin: pt(CGFloat(x), CGFloat(y + 5)), size: NSSize(width: CGFloat(w) * k, height: 5 * k))
+    mark.append(NSBezierPath(roundedRect: r, xRadius: 2.5 * k, yRadius: 2.5 * k))
+}
+NSColor.white.setFill()
+mark.fill()
 
 NSGraphicsContext.restoreGraphicsState()
 try! rep.representation(using: .png, properties: [:])!.write(to: URL(fileURLWithPath: out))

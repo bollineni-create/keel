@@ -1,110 +1,110 @@
 # Keel
 
-Keel is the design system for Naren's self-hosted money app: a Copilot-Money-class
-personal finance tool (accounts, transactions, budgets, recurring, investments, net
-worth) with a Claude assistant and an MCP endpoint built in. One person uses it, on a
-Mac and a phone, many times a day. The system exists so every screen, chart and
-assistant reply looks like one product.
+Keel is the design system for Naren's self-hosted money app — a functional twin of
+Copilot Money's Mac app (same screens, panes, rows, charts and workflows; see the repo's
+`docs/copilot-feature-map.md`) with its own name, palette and icon set. One person uses it
+on a Mac and a phone, with a Claude assistant and an MCP endpoint built in. This system
+exists so every screen Claude Code builds lands in the same place.
 
 ## Principles
 
-1. **Figures first.** The number is the content. Amounts are set in the mono family
-   (`amount`, `amount-xl`) with tabular digits so columns line up; everything around a
-   number is quieter than the number.
-2. **Dark is home.** The app is dark-first (`bg-000` `#0d1014`). Light is a full
-   peer, not an inversion: the light ground is warm paper (`#f4f3ee`), never pure
-   white, and white is reserved for cards (`bg-100`).
-3. **Borders, not shadows.** Surfaces are separated by one step of ground
-   (`bg-000` → `bg-100` → `bg-200`) and a `hairline`. The only shadow in the system is
-   `shadow-pop`, for popovers and the assistant sheet.
-4. **Three meanings, three hues.** `brand` green = positive / income / on-track.
-   `spend` coral = spending / negative / over. `amber` = attention (pending,
-   unreviewed, nearly spent, stale sync). They differ in lightness as well as hue, so
-   they survive colour-blindness and a dark/light flip.
-5. **Dense but breathable.** Rows are 12px tall-padded (`space-3`), cards 16px
-   (`space-4`). The phone layout is the desktop layout with the sidebar folded into a
-   bottom tab bar; no screen gets a different information architecture per device.
+1. **Three panes, one rhythm.** Sidebar (`sidebar-w` 232px) · main · detail. Every pane
+   starts with a 44px TitleBar (`titlebar-h`). Main and detail scroll independently.
+   Content is a vertical stack of Cards on the `bg-000` ground; inside a card, rows.
+2. **Light first.** The ground is cool grey (`bg-000` `#f5f6f8`), cards are white
+   (`bg-100`) with a `hairline` border and `shadow-card`. Dark is a full peer with the same
+   token names; never ship a screen that only works in one.
+3. **Figures in mono, colour means direction.** Every amount is `amount` (mono, tabular).
+   `positive` green = income, up, paid, under budget. `negative` red = over, down,
+   overdue, delete. `warning` amber = near budget, overdue label, needs attention. Grey
+   `neutral-chip` = flat. Assets are `assets` blue and debt is `debt` orange on every
+   chart, no exceptions.
+4. **Tags carry the category.** A CategoryTag is emoji + UPPERCASE `tag` text on a tinted
+   pill in one of twelve hues (`cat-1`…`cat-12` with `-tint`). The hue is assigned per
+   parent category and inherited by its children; it is the same hue in every row, chart
+   segment and donut slice for that category.
+5. **Dense, quiet rows.** Rows are 40px (`row-h`), two-line rows 52px; separators are
+   `hairline`; hover is `bg-200`; selection is `brand-tint`. Nothing bold except the
+   primary text and the amount.
 
 ## Colour
 
-| Role | Token | Dark | Light |
+| Role | Token | Light | Dark |
 | --- | --- | --- | --- |
-| Ground | `bg-000` | `#0d1014` | `#f4f3ee` |
-| Card | `bg-100` | `#151a20` | `#ffffff` |
-| Field / hover | `bg-200` | `#1d242c` | `#ebe9e2` |
-| Divider | `hairline` | `#2a323c` | `#d6d3c9` |
+| Ground / card / field | `bg-000` / `bg-100` / `bg-200` | `#f5f6f8` / `#fff` / `#eef0f3` | `#0f1216` / `#171b21` / `#1f252c` |
+| Divider | `hairline` | `#e6e8ec` | `#2a323c` |
 | Text | `ink` / `ink-muted` / `ink-faint` | | |
-| Positive / primary | `brand` | `#3ccf9a` | `#117a58` |
-| Spend / negative | `spend` | `#ff7a66` | `#c23d2a` |
-| Attention | `amber` | `#f2b64f` | `#8a5a00` |
-| Chart series 2 / 3 | `sky` / `violet` | | |
+| Brand / active nav / links | `brand` (+ `brand-tint`) | `#117a58` | `#3ccf9a` |
+| Up / income / paid | `positive` (+ tint) | `#15803d` | `#4ade80` |
+| Down / over / overdue | `negative` (+ tint) | `#dc2626` | `#f87171` |
+| Near limit / attention | `warning` (+ tint) | `#d97706` | `#fbbf24` |
+| Assets · Debt | `assets` · `debt` (+ tints) | `#2f6fed` · `#f97316` | |
+| Spending pace | `pace-good` → `pace-warn` → `pace-over` | green → amber → red | |
+| Projection / comparison | `projection` | dotted grey | |
+| Category hues | `cat-1`…`cat-12` + `-tint` | | |
 
 Rules:
-
-- Body text is `ink` on `bg-000` or `bg-100`; `ink-muted` is for the second line of a
-  row. `ink-faint` never carries information a person must read.
-- An amount is coloured only when its sign matters: income rows and positive change
-  in `brand`, spending that is over budget or negative change in `spend`. Ordinary
-  spending rows stay `ink` — a wall of coral is noise.
-- Budget bars: `brand-tint` track with a `brand` fill up to 80%, `amber` from 80–100%,
-  `spend` past 100% on a `spend-tint` track.
-- Charts: series 1 `brand`, series 2 `sky`, series 3 `violet`; spend-vs-income bars
-  use `spend` and `brand`. Gridlines are `hairline`; ticks are `ink-faint` in
-  `mono-sm`.
+- Body text `ink`; secondary `ink-muted`; `ink-faint` only for ticks and placeholders.
+- Amounts stay `ink`; only income (`+$3,063.48`) is `positive`, only over/overdue is
+  `negative`. A wall of coloured numbers is noise.
+- Budget bars: `pace-good` under 80%, `pace-warn` 80–100%, `pace-over` past 100%, track
+  `bg-200`. The monthly-spending line changes colour along its length by the same rule.
+- Charts: assets `assets`, debt `debt`, income columns `assets`, net income columns
+  `positive`/`negative` by sign, spend stacks in category hues, comparison period as a
+  dotted `projection` line, a `Now` marker in `ink-faint`.
 
 ## Type
 
-Inter for UI, IBM Plex Mono for figures. Both are hosted faces (Google Fonts); the
-app loads `Inter:wght@400;500;600` and `IBM+Plex+Mono:wght@400;500`.
+Inter for UI, IBM Plex Mono for figures (Google Fonts: `Inter:wght@400;500;600`,
+`IBM+Plex+Mono:wght@500;600`).
 
-- `display` 40/44 600 — the brand name and one headline label per screen.
-- `h1` 24/30 — screen titles. `h2` 17/22 — card titles.
-- `body` 15/22, `body-sm` 13/18 — rows and captions. `label` 12/16 600 uppercase,
-  0.04em — eyebrows and nav.
-- `amount-xl` 36/40 mono — the single hero figure. `amount` 15/22 mono — every
-  other number. `mono-sm` 12/16 — masks, tickers, axis ticks.
+`h1` 22/28 (detail titles) · `title` 15/20 (title bars) · `h2` 15/20 (card titles) ·
+`body` 13/18 500 (row text, nav) · `body-sm` 12/16 (captions) · `eyebrow` 11/14 600
+uppercase 0.06em (MY ACCOUNTS, CardLink, column headers) · `tag` 10/14 700 uppercase ·
+`hero` 28/32 mono (big figures) · `hero-sm` 20/24 mono · `amount` 13/18 mono 600 ·
+`amount-sm` 11/14 mono.
 
-Numbers are formatted `$1,234.56`; change is always signed (`+$120.00`, `−$42.17`)
-using a true minus (U+2212). Percentages carry one decimal.
+Money: `$1,234.56`; abbreviated in the sidebar (`$5,278`); change always signed
+(`+$96.96`, `−$42.12`, true minus). Percentages one decimal in chips (`33.65%`), none in
+budget bars.
 
 ## Spacing and radius
 
-A 4px grid: `space-1` 4 · `space-2` 8 · `space-3` 12 · `space-4` 16 · `space-5` 24 ·
-`space-6` 32 · `space-8` 48. Radii: `radius-sm` 6 (chips, inputs), `radius-md` 10
-(buttons), `radius-lg` 16 (cards, sheets), `radius-pill` for bars and segmented
-controls.
+4px grid. `space-1` 4 · `space-2` 8 · `space-3` 12 · `space-4` 16 · `space-5` 24 ·
+`space-6` 32. Cards `radius-lg` 12; nav pill and popovers `radius-md` 8; inputs and
+buttons `radius-sm` 6; tags, chips, bars, avatars `radius-pill`.
 
 ## Iconography
 
-Outline icons at 1.5px stroke, 20px on desktop, 24px in the phone tab bar, drawn in
-`currentColor`. Category icons sit in a 32px disc of `bg-200` (or the category's
-tint when it has one). No emoji in UI chrome; category emoji are allowed only where
-the person chose one in the source app.
+Lucide icons, 1.5px stroke, 16px in rows and title bars, 18px in the sidebar nav, 22px in
+the phone tab bar, `currentColor`. Nav icon map: Dashboard `layout-dashboard` ·
+Transactions `list` · Goals `flag` · Cash flow `arrow-left-right` · Accounts `landmark` ·
+Investments `trending-up` · Categories `tags` · Recurrings `repeat` · Settings `settings`
+· Start here `rocket` · Get help `circle-help`. Institution avatars are 24px discs showing
+the institution logo when the data has one, else the first letter on `bg-300`. Category
+emoji come from the data and are never replaced.
 
-## Components (conventions)
+## Components
 
-- **Row** — 56px: 32px icon disc · name (`body`) over meta (`body-sm`, `ink-muted`) ·
-  amount (`amount`) right-aligned. Pending rows show an `amber` dot before the meta.
-- **Card** — `bg-100`, 1px `hairline`, `radius-lg`, `space-4` padding, `h2` title
-  with an optional `label` eyebrow above it.
-- **Stat tile** — eyebrow `label` in `ink-muted`, figure in `amount-xl`, change line
-  in `body-sm` coloured by sign.
-- **Budget bar** — 8px `radius-pill` bar, label row above, "spent of limit" in
-  `body-sm` to the right.
-- **Assistant** — messages in `body`; the assistant's turn sits on `brand-tint`
-  (dark) / `bg-200` (light); tool calls render as a collapsed `mono-sm` line.
-- **Nav** — desktop: 232px sidebar on `bg-100`; phone: five-tab bar (Home,
-  Transactions, Budgets, Accounts, Assistant). Active item in `brand`.
+Live previews live under Components. Each has a README with its anatomy and rules. The
+set: TitleBar · NavItem · AccountNavRow · Card · CardLink · StatHero · ChangeChip ·
+RangeControl · CategoryTag · TransactionRow · BudgetBar · CategoryRow · AccountRow ·
+RecurringRow · TickerCard · RuleChip · DetailHeader · EmptyState · Toggle · Button.
+
+Composition per screen is in the repo under `docs/screens/`; the wireframes under
+`docs/visuals/` are drawn from these tokens.
 
 ## Voice
 
-Short, specific, no exclamation marks. The assistant says what it did and what the
-number means: "You've spent $1,240 of $1,500 on dining — 83%, with 11 days left."
+Short and specific. Card links are verbs or nouns in eyebrow caps with an arrow
+(`VIEW ALL ↗`). Empty states are one sentence that says what will fill the space.
+The assistant says what the number means: "You've spent $6,237 of $6,353 — $116 left
+with 10 days to go."
 
 ## Code
 
 The app lives at https://github.com/bollineni-create/keel. `design/tokens.json` in the
-repo is a verbatim copy of this system's `tokens.json`; `npm run tokens` generates
-`web/tokens.css` from it, and `web/styles.css` uses only those variables. To change the
-design: edit this system here, then copy `tokens.json` and this README into the repo's
-`design/` folder and run `npm run tokens` (the repo's CLAUDE.md spells out the steps).
+repo is a verbatim copy of this system's `tokens.json` and `design/README.md` of this
+file; `npm run tokens` generates `web/tokens.css`, and app CSS uses only those variables.
+To change the design: edit this system here, copy `tokens.json` and this README into the
+repo's `design/` folder, run `npm run tokens` (the repo's CLAUDE.md spells out the steps).

@@ -1,9 +1,72 @@
 /* Keel — generated from design/tokens.json by scripts/tokens-to-css.mjs. Do not edit. */
-:root, [data-theme="dark"] {
-  --bg-000: #0d1014;
-  --bg-100: #151a20;
-  --bg-200: #1d242c;
-  --bg-300: #283039;
+:root, [data-theme="light"] {
+  --bg-000: #f5f6f8;
+  --bg-100: #ffffff;
+  --bg-200: #eef0f3;
+  --bg-300: #e3e6ea;
+  --hairline: #e6e8ec;
+  --ink: #1a1d23;
+  --ink-muted: #6b7280;
+  --ink-faint: #9ca3af;
+  --brand: #117a58;
+  --brand-ink: #ffffff;
+  --brand-tint: #e3f3ec;
+  --positive: #15803d;
+  --positive-tint: #dcfce7;
+  --negative: #dc2626;
+  --negative-tint: #fee2e2;
+  --warning: #d97706;
+  --warning-tint: #fef3c7;
+  --neutral-chip: #6b7280;
+  --neutral-chip-tint: #eef0f3;
+  --assets: #2f6fed;
+  --assets-tint: #dbe7ff;
+  --debt: #f97316;
+  --debt-tint: #ffedd5;
+  --pace-good: #22c55e;
+  --pace-warn: #f59e0b;
+  --pace-over: #ef4444;
+  --projection: #c4c8cf;
+  --focus: #2f6fed;
+  --cat-1: #d97706;
+  --cat-1-tint: #fef3c7;
+  --cat-2: #0e7490;
+  --cat-2-tint: #cffafe;
+  --cat-3: #7c3aed;
+  --cat-3-tint: #ede9fe;
+  --cat-4: #0f766e;
+  --cat-4-tint: #ccfbf1;
+  --cat-5: #be185d;
+  --cat-5-tint: #fce7f3;
+  --cat-6: #b91c1c;
+  --cat-6-tint: #fee2e2;
+  --cat-7: #4338ca;
+  --cat-7-tint: #e0e7ff;
+  --cat-8: #a16207;
+  --cat-8-tint: #fef9c3;
+  --cat-9: #15803d;
+  --cat-9-tint: #dcfce7;
+  --cat-10: #c2410c;
+  --cat-10-tint: #ffedd5;
+  --cat-11: #1d4ed8;
+  --cat-11-tint: #dbeafe;
+  --cat-12: #475569;
+  --cat-12-tint: #e2e8f0;
+  --spend: var(--negative);
+  --spend-tint: var(--negative-tint);
+  --amber: var(--warning);
+  --amber-tint: var(--warning-tint);
+  --sky: var(--assets);
+  --violet: var(--cat-3);
+  --shadow-card: 0 1px 2px rgba(16,24,40,0.04);
+  --shadow-pop: 0 12px 32px rgba(16,24,40,0.14);
+  color-scheme: light;
+}
+[data-theme="dark"] {
+  --bg-000: #0f1216;
+  --bg-100: #171b21;
+  --bg-200: #1f252c;
+  --bg-300: #2a313a;
   --hairline: #2a323c;
   --ink: #eef1f4;
   --ink-muted: #9aa5b1;
@@ -11,37 +74,56 @@
   --brand: #3ccf9a;
   --brand-ink: #06231a;
   --brand-tint: #143428;
-  --spend: #ff7a66;
-  --spend-tint: #3b1f1c;
-  --amber: #f2b64f;
-  --amber-tint: #3a2e14;
-  --sky: #7cc1ff;
-  --violet: #b9a2ff;
+  --positive: #4ade80;
+  --positive-tint: #14361f;
+  --negative: #f87171;
+  --negative-tint: #3b1a1a;
+  --warning: #fbbf24;
+  --warning-tint: #3a2e14;
+  --neutral-chip: #9aa5b1;
+  --neutral-chip-tint: #1f252c;
+  --assets: #7cc1ff;
+  --assets-tint: #15283f;
+  --debt: #fb923c;
+  --debt-tint: #3d2412;
+  --pace-good: #4ade80;
+  --pace-warn: #fbbf24;
+  --pace-over: #f87171;
+  --projection: #4b5563;
   --focus: #7cc1ff;
+  --cat-1: #fbbf24;
+  --cat-1-tint: #3a2e14;
+  --cat-2: #67e8f9;
+  --cat-2-tint: #113a42;
+  --cat-3: #c4b5fd;
+  --cat-3-tint: #2e2350;
+  --cat-4: #5eead4;
+  --cat-4-tint: #113b36;
+  --cat-5: #f9a8d4;
+  --cat-5-tint: #4a1a33;
+  --cat-6: #fca5a5;
+  --cat-6-tint: #451a1a;
+  --cat-7: #a5b4fc;
+  --cat-7-tint: #232a5c;
+  --cat-8: #fde047;
+  --cat-8-tint: #3f3a0f;
+  --cat-9: #86efac;
+  --cat-9-tint: #14361f;
+  --cat-10: #fdba74;
+  --cat-10-tint: #3d2412;
+  --cat-11: #93c5fd;
+  --cat-11-tint: #172a4a;
+  --cat-12: #cbd5e1;
+  --cat-12-tint: #2a3441;
+  --spend: var(--negative);
+  --spend-tint: var(--negative-tint);
+  --amber: var(--warning);
+  --amber-tint: var(--warning-tint);
+  --sky: var(--assets);
+  --violet: var(--cat-3);
+  --shadow-card: none;
   --shadow-pop: 0 12px 32px rgba(0,0,0,0.55);
   color-scheme: dark;
-}
-[data-theme="light"] {
-  --bg-000: #f4f3ee;
-  --bg-100: #ffffff;
-  --bg-200: #ebe9e2;
-  --bg-300: #dedbd2;
-  --hairline: #d6d3c9;
-  --ink: #15191e;
-  --ink-muted: #5a6470;
-  --ink-faint: #8a929b;
-  --brand: #117a58;
-  --brand-ink: #ffffff;
-  --brand-tint: #d8f0e5;
-  --spend: #c23d2a;
-  --spend-tint: #f6ddd8;
-  --amber: #8a5a00;
-  --amber-tint: #f8ead0;
-  --sky: #1d5fa8;
-  --violet: #5b43b8;
-  --focus: #1d5fa8;
-  --shadow-pop: 0 12px 32px rgba(21,25,30,0.14);
-  color-scheme: light;
 }
 :root {
   --space-1: 4px;
@@ -51,19 +133,24 @@
   --space-5: 24px;
   --space-6: 32px;
   --space-8: 48px;
+  --sidebar-w: 232px;
+  --titlebar-h: 44px;
+  --row-h: 40px;
   --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 16px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
   --radius-pill: 999px;
   --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
 }
-.display { font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif; font-size: 40px; line-height: 44px; font-weight: 600; letter-spacing: -0.02em; }
-.h1 { font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif; font-size: 24px; line-height: 30px; font-weight: 600; letter-spacing: -0.01em; }
-.h2 { font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif; font-size: 17px; line-height: 22px; font-weight: 600; }
-.body { font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif; font-size: 15px; line-height: 22px; font-weight: 400; }
-.body-sm { font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif; font-size: 13px; line-height: 18px; font-weight: 400; }
-.label { font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif; font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: 0.04em; }
-.amount-xl { font-family: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace; font-size: 36px; line-height: 40px; font-weight: 500; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
-.amount { font-family: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace; font-size: 15px; line-height: 22px; font-weight: 500; font-variant-numeric: tabular-nums; }
-.mono-sm { font-family: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace; font-size: 12px; line-height: 16px; font-weight: 400; font-variant-numeric: tabular-nums; }
+.h1 { font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif; font-size: 22px; line-height: 28px; font-weight: 600; letter-spacing: -0.01em; }
+.title { font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif; font-size: 15px; line-height: 20px; font-weight: 600; }
+.h2 { font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif; font-size: 15px; line-height: 20px; font-weight: 600; }
+.body { font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif; font-size: 13px; line-height: 18px; font-weight: 500; }
+.body-sm { font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif; font-size: 12px; line-height: 16px; font-weight: 400; }
+.eyebrow { font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif; font-size: 11px; line-height: 14px; font-weight: 600; letter-spacing: 0.06em; }
+.tag { font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif; font-size: 10px; line-height: 14px; font-weight: 700; letter-spacing: 0.04em; }
+.hero { font-family: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace; font-size: 28px; line-height: 32px; font-weight: 600; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.hero-sm { font-family: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace; font-size: 20px; line-height: 24px; font-weight: 600; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
+.amount { font-family: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace; font-size: 13px; line-height: 18px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.amount-sm { font-family: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace; font-size: 11px; line-height: 14px; font-weight: 500; font-variant-numeric: tabular-nums; }

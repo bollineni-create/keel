@@ -1,0 +1,69 @@
+/* Keel — generated from design/tokens.json by scripts/tokens-to-css.mjs. Do not edit. */
+:root, [data-theme="dark"] {
+  --bg-000: #0d1014;
+  --bg-100: #151a20;
+  --bg-200: #1d242c;
+  --bg-300: #283039;
+  --hairline: #2a323c;
+  --ink: #eef1f4;
+  --ink-muted: #9aa5b1;
+  --ink-faint: #66717d;
+  --brand: #3ccf9a;
+  --brand-ink: #06231a;
+  --brand-tint: #143428;
+  --spend: #ff7a66;
+  --spend-tint: #3b1f1c;
+  --amber: #f2b64f;
+  --amber-tint: #3a2e14;
+  --sky: #7cc1ff;
+  --violet: #b9a2ff;
+  --focus: #7cc1ff;
+  --shadow-pop: 0 12px 32px rgba(0,0,0,0.55);
+  color-scheme: dark;
+}
+[data-theme="light"] {
+  --bg-000: #f4f3ee;
+  --bg-100: #ffffff;
+  --bg-200: #ebe9e2;
+  --bg-300: #dedbd2;
+  --hairline: #d6d3c9;
+  --ink: #15191e;
+  --ink-muted: #5a6470;
+  --ink-faint: #8a929b;
+  --brand: #117a58;
+  --brand-ink: #ffffff;
+  --brand-tint: #d8f0e5;
+  --spend: #c23d2a;
+  --spend-tint: #f6ddd8;
+  --amber: #8a5a00;
+  --amber-tint: #f8ead0;
+  --sky: #1d5fa8;
+  --violet: #5b43b8;
+  --focus: #1d5fa8;
+  --shadow-pop: 0 12px 32px rgba(21,25,30,0.14);
+  color-scheme: light;
+}
+:root {
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-8: 48px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-pill: 999px;
+  --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+.display { font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif; font-size: 40px; line-height: 44px; font-weight: 600; letter-spacing: -0.02em; }
+.h1 { font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif; font-size: 24px; line-height: 30px; font-weight: 600; letter-spacing: -0.01em; }
+.h2 { font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif; font-size: 17px; line-height: 22px; font-weight: 600; }
+.body { font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif; font-size: 15px; line-height: 22px; font-weight: 400; }
+.body-sm { font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif; font-size: 13px; line-height: 18px; font-weight: 400; }
+.label { font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif; font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: 0.04em; }
+.amount-xl { font-family: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace; font-size: 36px; line-height: 40px; font-weight: 500; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.amount { font-family: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace; font-size: 15px; line-height: 22px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.mono-sm { font-family: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace; font-size: 12px; line-height: 16px; font-weight: 400; font-variant-numeric: tabular-nums; }

@@ -1,1 +1,119 @@
-# keel
+# Keel
+
+Self-hosted personal finance on top of your **Copilot Money** data — your accounts,
+transactions, budgets, recurring charges, holdings and net worth in a PWA that runs on
+your Mac and installs on your phone, with a **Claude assistant** built in and an **MCP
+endpoint** so Claude Desktop / Claude Code / claude.ai can work with the same data.
+
+Keel is not affiliated with Copilot Money. It reads your data through the open-source
+[`copilot-money-mcp`](https://github.com/ignaciohermosillacornejo/copilot-money-mcp)
+server, which parses the Copilot Mac app's local cache (no network) and, optionally,
+talks to Copilot's API with your own browser session.
+
+## Requirements
+
+- macOS with the **Copilot Money** Mac app installed and opened at least once
+- Node.js 20+ (`brew install node`)
+- An Anthropic API key for the in-app assistant (optional; MCP works without it)
+
+## Setup (5 minutes)
+
+```bash
+cd keel
+npm install
+cp .env.example .env        # add ANTHROPIC_API_KEY, pick a KEEL_TOKEN
+npm run sync                # first pull from Copilot's local cache (~10–30 s)
+npm start                   # http://localhost:4242
+```
+
+Open **http://localhost:4242**. Settings → *Sync from Copilot* re-pulls any time; the
+server also re-syncs every `KEEL_SYNC_MINUTES` (default 30).
+
+No Copilot cache yet? `npm run demo` seeds sample data so you can explore the UI, and
+Settings → *Import Copilot CSV export* loads a CSV from the Copilot app.
+
+### Live data and write-through
+
+By default Keel reads Copilot's **local cache** (offline, no auth). Two opt-ins in `.env`:
+
+```
+COPILOT_MCP_ARGS=-y copilot-money-mcp --live-reads   # fresh reads from Copilot's API
+COPILOT_MCP_ARGS=-y copilot-money-mcp --write        # + push edits back (categorize, review, notes, budgets)
+```
+
+Both need a browser (Chrome/Safari/Firefox) logged in to app.copilot.money; the
+server reuses that session. Without `--write`, edits you make in Keel apply locally and
+are queued (Settings shows the count).
+
+## Phone
+
+1. Set `HOST=0.0.0.0` (default) and a `KEEL_TOKEN` in `.env`.
+2. On the same Wi-Fi: open `http://<your-mac>.local:4242/?token=<KEEL_TOKEN>` in Safari,
+   Share → **Add to Home Screen**. The token is remembered in a cookie.
+3. Away from home: install [Tailscale](https://tailscale.com) on both devices and use
+   `http://<mac-tailnet-name>:4242`, or `tailscale serve 4242` for HTTPS.
+
+Keep the Mac awake (`caffeinate -s npm start`, or a launchd agent — see below).
+
+## Connect Claude (MCP)
+
+Keel exposes 16 tools (`get_overview`, `get_transactions`, `get_budgets`,
+`find_unusual_transactions`, `update_transaction`, `set_budget`, `sync_now`, …).
+
+**Claude Code**
+```bash
+claude mcp add --transport http keel http://localhost:4242/mcp \
+  --header "Authorization: Bearer $KEEL_TOKEN"
+```
+
+**Claude Desktop** — `~/Library/Application Support/Claude/claude_desktop_config.json`:
+```json
+{ "mcpServers": { "keel": { "command": "npm", "args": ["--prefix", "/path/to/keel", "run", "-s", "mcp"] } } }
+```
+
+**claude.ai custom connector** — expose `/mcp` over HTTPS (`tailscale funnel 4242` or
+`ngrok http 4242`), then Settings → Connectors → Add custom connector with the URL and
+header `Authorization: Bearer <KEEL_TOKEN>`.
+
+## In-app assistant
+
+Set `ANTHROPIC_API_KEY` (and optionally `KEEL_MODEL`, default `claude-sonnet-5-5`).
+The Assistant tab streams replies and shows each tool call. Conversations are stored
+locally in SQLite. Your financial data goes to Anthropic's API when you use it.
+
+## Run at login (launchd)
+
+`~/Library/LaunchAgents/money.keel.plist`:
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>Label</key><string>money.keel</string>
+  <key>ProgramArguments</key><array><string>/opt/homebrew/bin/npm</string><string>start</string></array>
+  <key>WorkingDirectory</key><string>/path/to/keel</string>
+  <key>RunAtLoad</key><true/><key>KeepAlive</key><true/>
+  <key>StandardOutPath</key><string>/tmp/keel.log</string><key>StandardErrorPath</key><string>/tmp/keel.err</string>
+</dict></plist>
+```
+`launchctl load ~/Library/LaunchAgents/money.keel.plist`
+
+## Layout
+
+```
+src/server.ts      Express: static PWA, /api, /mcp (Streamable HTTP), /api/assistant (SSE)
+src/tools.ts       the one tool registry (assistant + MCP + REST share it)
+src/queries.ts     read models: budgets, net worth, trends, unusual spend
+src/sync/copilot.ts MCP client → copilot-money-mcp → SQLite; write-through queue
+src/sync/csv.ts    Copilot CSV importer
+src/assistant.ts   Anthropic tool loop, streamed
+src/mcp.ts         Keel as an MCP server
+web/               buildless PWA (index.html, app.js, styles.css, sw.js)
+data/keel.db       your data (SQLite). Back this up; delete it to start over.
+```
+
+Amount convention (from Copilot): **positive = money out, negative = money in.**
+
+## Design
+
+Screens follow the *Keel* design system (tokens in `web/styles.css`): dark-first,
+figures in IBM Plex Mono, green = positive, coral = spend, amber = attention.

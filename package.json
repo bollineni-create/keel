@@ -1,0 +1,39 @@
+{
+  "name": "keel",
+  "version": "0.1.0",
+  "description": "Self-hosted personal finance app on top of your Copilot Money data, with a built-in Claude assistant and MCP server.",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "start": "tsx src/server.ts",
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "sync": "tsx src/cli.ts sync",
+    "import": "tsx src/cli.ts import",
+    "demo": "tsx src/cli.ts demo",
+    "mcp": "tsx src/mcp-stdio.ts",
+    "tokens": "node scripts/tokens-to-css.mjs"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.52.0",
+    "@modelcontextprotocol/sdk": "^1.17.0",
+    "better-sqlite3": "^11.6.0",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.2",
+    "multer": "^1.4.5-lts.1",
+    "zod": "^3.23.8",
+    "zod-to-json-schema": "^3.23.5"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.11",
+    "@types/express": "^4.17.21",
+    "@types/multer": "^1.4.12",
+    "@types/node": "^20.14.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}

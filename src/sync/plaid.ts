@@ -210,7 +210,12 @@ export function applyTransactions(conn: ConnectionRow, added: Json[], modified: 
     counts.transactions = (counts.transactions ?? 0) + upsert('transactions', rows, ['id'], { preserveEdited: true, insertOnly: TX_INSERT_ONLY });
     // A posted row replaces its pending row: keep what the user did to the pending one.
     const carry = d.prepare(`UPDATE transactions SET (${CARRY.join(', ')}) = (SELECT ${CARRY.join(', ')} FROM transactions p WHERE p.id = ?) WHERE id = ? AND EXISTS (SELECT 1 FROM transactions p WHERE p.id = ?)`);
-    for (const [posted, pending] of pendingLinks) carry.run(pending, posted, pending);
+    // A rename is carried only if the user made it; otherwise the posted row keeps Plaid's (often better) name.
+    const carryName = d.prepare(`UPDATE transactions SET name = (SELECT name FROM transactions p WHERE p.id = ?) WHERE id = ? AND EXISTS (SELECT 1 FROM transactions p WHERE p.id = ? AND json_extract(p.local_edits, '$.name') IS NOT NULL)`);
+    for (const [posted, pending] of pendingLinks) {
+      carry.run(pending, posted, pending);
+      carryName.run(pending, posted, pending);
+    }
     const del = d.prepare('DELETE FROM transactions WHERE id = ? OR split_parent_id = ?');
     let n = 0;
     for (const id of removed) n += del.run(`plaid:${id}`, `plaid:${id}`).changes;

@@ -7,7 +7,7 @@ import { config } from './config.js';
 import { getDb, getMeta } from './db.js';
 import { buildMcpServer } from './mcp.js';
 import { chat } from './assistant.js';
-import { tools, publicTools, runTool } from './tools.js';
+import { tools, publicTools, runTool, toolMap } from './tools.js';
 import * as q from './queries.js';
 import { syncAll } from './sync/index.js';
 import { connectionCount, listConnections } from './sync/connections.js';
@@ -40,7 +40,8 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   const origin = req.get('origin');
   if (req.path.startsWith('/api') && req.method !== 'GET' && origin && origin !== 'null') {
     let same = false;
-    try { same = new URL(origin).host === req.get('host'); } catch {}
+    // A proxy that rewrites Host (ngrok --host-header=rewrite, nginx) passes the original in X-Forwarded-Host.
+    try { const o = new URL(origin).host; same = o === req.get('host') || o === req.get('x-forwarded-host'); } catch {}
     if (!same) return res.status(403).json({ error: 'cross-origin request refused' });
   }
   if (!config.token && connectionCount() > 0) {
@@ -168,7 +169,7 @@ api.post('/assistant', async (req, res) => {
   res.end();
 });
 api.get('/tools', (_req, res) => res.json(tools.map((t) => ({ name: t.name, description: t.description, read_only: t.readOnly, internal: Boolean(t.internal) }))));
-api.post('/tools/:name', wrap(async (req, res) => res.json(await runTool(req.params.name, req.body ?? {}))));
+api.post('/tools/:name', (req, res, next) => (toolMap.get(req.params.name)?.internal ? localOrToken(req, res, next) : next()), wrap(async (req, res) => res.json(await runTool(req.params.name, req.body ?? {}))));
 app.use('/api', api);
 
 // ---- MCP over Streamable HTTP (stateless: one server+transport per request) ----

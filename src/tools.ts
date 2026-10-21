@@ -11,7 +11,7 @@ import { getDb, markEdited, nowIso } from './db.js';
 import * as q from './queries.js';
 import { pushWrite } from './sync/copilot.js';
 import { connectionCount, deleteConnection, getConnection, listConnections, publicConnection } from './sync/connections.js';
-import { duplicateCandidates, supersedeAccount } from './sync/enrich.js';
+import { duplicateCandidates, rebuildBalanceHistory, supersedeAccount } from './sync/enrich.js';
 import { syncAll } from './sync/index.js';
 import { createLinkToken, exchangePublicToken, removeItem } from './sync/plaid.js';
 import { addSimplefinConnection, BRIDGE_URL } from './sync/simplefin.js';
@@ -347,6 +347,8 @@ export const tools: Tool<any>[] = [
       // Keel stores what's owed on cards and loans as a positive balance.
       if (f.type && q.LIABILITY_TYPES.has(f.type) && cur.balance < 0) d.prepare('UPDATE accounts SET balance = ? WHERE id = ?').run(Math.abs(cur.balance), account_id);
       markEdited('accounts', account_id, cols.map(([k]) => k));
+      // History walked back from transactions assumed the old type's sign.
+      if (f.type && f.type !== cur.type) rebuildBalanceHistory(account_id);
       return { ok: true, account: q.listAccounts(true, true).find((a) => a.id === account_id) };
     },
   }),
@@ -407,12 +409,17 @@ export const tools: Tool<any>[] = [
     internal: true,
     handler: async ({ connection_id, delete_data }) => {
       const c = getConnection(connection_id);
-      let revoked = false;
+      let revoked = false, warning: string | undefined;
       if (c.provider === 'plaid' && config.plaid.configured) {
-        await removeItem(c);
-        revoked = true;
+        // Offline, an outage or rotated keys must not trap the connection in Keel.
+        try {
+          await removeItem(c);
+          revoked = true;
+        } catch (e) {
+          warning = `Removed from Keel, but Plaid couldn't be told (${(e as Error).message}). Remove the Item from the Plaid dashboard to stop any billing.`;
+        }
       }
-      return { ok: true, revoked, removed: deleteConnection(c.id, Boolean(delete_data)), remaining: connectionCount() };
+      return { ok: true, revoked, warning, removed: deleteConnection(c.id, Boolean(delete_data)), remaining: connectionCount() };
     },
   }),
   def({

@@ -40,7 +40,9 @@ const PFC_HINTS: Array<[prefix: string, words: string[]]> = [
   ['GENERAL_MERCHANDISE', ['shopping']], ['HOME_IMPROVEMENT', ['home improvement', 'home', 'housing']],
   ['MEDICAL', ['health', 'medical']], ['PERSONAL_CARE', ['personal care', 'health']],
   ['GENERAL_SERVICES', ['services', 'subscription']], ['GOVERNMENT_AND_NON_PROFIT_DONATIONS', ['gift', 'donation', 'charity']], ['GOVERNMENT_AND_NON_PROFIT', ['tax', 'government']],
-  ['BANK_FEES', ['fee']], ['INCOME', ['income', 'paycheck', 'salary']], ['TRANSFER_IN', ['transfer']], ['TRANSFER_OUT', ['transfer']],
+  ['BANK_FEES', ['fee']], ['INCOME', ['income', 'paycheck', 'salary']],
+  ['TRANSFER_IN_ACCOUNT_TRANSFER', ['transfer']], ['TRANSFER_OUT_ACCOUNT_TRANSFER', ['transfer']], ['TRANSFER_IN_SAVINGS', ['transfer']], ['TRANSFER_OUT_SAVINGS', ['transfer']],
+  ['TRANSFER_IN_INVESTMENT', ['transfer']], ['TRANSFER_OUT_INVESTMENT', ['transfer']],
 ];
 
 /** Plaid category → one of the user's category ids, or null. */
@@ -58,9 +60,14 @@ export function categoryForPfc(detailed: string | null | undefined, primary: str
   return null;
 }
 
-export function isTransferPfc(primary: string | null | undefined, detailed?: string | null): boolean {
-  const p = (primary || '').toUpperCase();
-  return p === 'TRANSFER_IN' || p === 'TRANSFER_OUT' || (detailed || '').toUpperCase() === 'LOAN_PAYMENTS_CREDIT_CARD_PAYMENT';
+/**
+ * Plaid detailed categories that are money moving between the user's own accounts. ATM withdrawals,
+ * cash and check deposits, and P2P payments (TRANSFER_*_WITHDRAWAL / _DEPOSIT / _OTHER…) are real spending
+ * or income and stay; matchTransfers pairs any that turn out to be internal.
+ */
+const TRANSFER_DETAILED = /^(LOAN_PAYMENTS_CREDIT_CARD_PAYMENT|TRANSFER_(IN|OUT)_(ACCOUNT_TRANSFER|SAVINGS|INVESTMENT_AND_RETIREMENT_FUNDS))$/;
+export function isTransferPfc(_primary: string | null | undefined, detailed?: string | null): boolean {
+  return TRANSFER_DETAILED.test((detailed || '').toUpperCase());
 }
 
 /**
@@ -132,9 +139,10 @@ export function snapshotBalances(connectionId: string): number {
  * through the transactions so the net-worth chart doesn't jump on the day a bank was linked. Fills only
  * days with no history yet; skips investment accounts (market moves aren't transactions).
  */
-export function backfillBalances(connectionId: string): number {
+export function backfillBalances(connectionId: string, accountId?: string): number {
   const d = getDb();
-  const accts = d.prepare(`SELECT id, type, balance FROM accounts WHERE connection_id = ? AND type != 'investment'`).all(connectionId) as Array<{ id: string; type: string; balance: number }>;
+  const accts = (d.prepare(`SELECT id, type, balance FROM accounts WHERE connection_id = ? AND type != 'investment'`).all(connectionId) as Array<{ id: string; type: string; balance: number }>)
+    .filter((a) => !accountId || a.id === accountId);
   const days = d.prepare(`SELECT date, SUM(amount) total FROM transactions WHERE account_id = ? AND pending = 0 AND split_parent_id IS NULL GROUP BY date ORDER BY date DESC`);
   const insert = d.prepare('INSERT OR IGNORE INTO balance_history(date, account_id, balance) VALUES (?,?,?)');
   const today = new Date().toISOString().slice(0, 10);
@@ -155,6 +163,18 @@ export function backfillBalances(connectionId: string): number {
     }
   })();
   return n;
+}
+
+/** After an account's type is corrected: its history was walked with the wrong sign, so redo it. */
+export function rebuildBalanceHistory(accountId: string): number {
+  const d = getDb();
+  const a = d.prepare('SELECT connection_id FROM accounts WHERE id = ?').get(accountId) as { connection_id: string | null } | undefined;
+  if (!a?.connection_id) return 0;
+  d.prepare('DELETE FROM balance_history WHERE account_id = ? AND date >= (SELECT COALESCE(MIN(date), ?) FROM transactions WHERE account_id = ?)').run(accountId, '9999-12-31', accountId);
+  const today = new Date().toISOString().slice(0, 10);
+  const bal = (d.prepare('SELECT balance FROM accounts WHERE id = ?').get(accountId) as { balance: number }).balance;
+  d.prepare('INSERT INTO balance_history(date, account_id, balance) VALUES (?,?,?) ON CONFLICT(date, account_id) DO UPDATE SET balance = excluded.balance').run(today, accountId, bal);
+  return backfillBalances(a.connection_id, accountId);
 }
 
 /** The day after which a superseded Copilot account stops supplying rows (see db.ts superseded_from). */
@@ -195,8 +215,11 @@ export function supersedeAccount(directAccountId: string, copilotAccountId: stri
   let moved = 0, droppedDirect = 0, droppedCopilot = 0;
   d.transaction(() => {
     d.prepare('UPDATE accounts SET superseded_by = ?, superseded_from = ?, hidden = 1 WHERE id = ?').run(directAccountId, from, copilotAccountId);
-    droppedDirect = d.prepare('DELETE FROM transactions WHERE account_id = ? AND date < ? AND local_edits IS NULL').run(directAccountId, from).changes;
-    droppedCopilot = d.prepare('DELETE FROM transactions WHERE account_id = ? AND date >= ?').run(copilotAccountId, from).changes;
+    // Copilot covers everything before `from`, so the direct copy of those days goes.
+    droppedDirect = d.prepare('DELETE FROM transactions WHERE account_id = ? AND date < ?').run(directAccountId, from).changes;
+    // Only Copilot's own rows go; cash entries and splits the user added to that account stay.
+    droppedCopilot = d.prepare(`DELETE FROM transactions WHERE account_id = ? AND date >= ? AND COALESCE(source, 'copilot') = 'copilot'`).run(copilotAccountId, from).changes;
+    d.prepare('DELETE FROM holdings WHERE account_id = ?').run(copilotAccountId);
     moved = d.prepare('INSERT OR IGNORE INTO balance_history(date, account_id, balance) SELECT date, ?, balance FROM balance_history WHERE account_id = ? AND date < ?').run(directAccountId, copilotAccountId, from).changes;
   })();
   return { moved_history: moved, dropped_direct: droppedDirect, dropped_copilot: droppedCopilot };

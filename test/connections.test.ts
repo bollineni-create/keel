@@ -71,6 +71,26 @@ test('simplefin: type guesses', () => {
   assert.equal(sfin.guessType('Roth IRA', 'Fidelity', 9000), 'investment');
   assert.equal(sfin.guessType('Auto Loan', 'Capital One', -9000), 'loan');
   assert.equal(sfin.guessType('Everyday', 'Some CU', -40), 'credit');
+  // the institution's name says nothing about the account
+  assert.equal(sfin.guessType('Share Savings', 'Navy Federal Credit Union', 500), 'depository');
+  assert.equal(sfin.guessType('Online Savings', 'Discover Bank', 500), 'depository');
+  assert.equal(sfin.guessType('Debit Card Account', 'Some Bank', 500), 'depository');
+  assert.equal(sfin.guessType('Student Checking', 'Some Bank', 50), 'depository');
+  assert.equal(sfin.guessType('Visa Signature', 'Navy Federal Credit Union', -50), 'credit');
+});
+
+test('plaid: only account-to-account moves are transfers', () => {
+  assert.equal(enrich.isTransferPfc('LOAN_PAYMENTS', 'LOAN_PAYMENTS_CREDIT_CARD_PAYMENT'), true);
+  assert.equal(enrich.isTransferPfc('TRANSFER_OUT', 'TRANSFER_OUT_ACCOUNT_TRANSFER'), true);
+  assert.equal(enrich.isTransferPfc('TRANSFER_OUT', 'TRANSFER_OUT_WITHDRAWAL'), false, 'ATM cash is spending');
+  assert.equal(enrich.isTransferPfc('TRANSFER_IN', 'TRANSFER_IN_DEPOSIT'), false, 'a check deposit is income');
+});
+
+test('syncAll queues a different request behind a running one', async () => {
+  const [a, b] = [sync.syncAll({ provider: 'plaid' }), sync.syncAll({ provider: 'simplefin' })];
+  assert.notEqual(a, b);
+  assert.equal(sync.syncAll({ provider: 'plaid' }), a, 'an identical request shares the run');
+  await Promise.all([a, b]);
 });
 
 let sfinId = '';
@@ -158,6 +178,34 @@ test('simplefin: pending rows that re-post under a new id are dropped; edits sur
   assert.equal(tx(`${checking}:T3b`).amount, 9.99);
   assert.equal(tx(`${checking}:T1`).note, 'weekly shop');
   assert.equal(JSON.parse(tx(`${checking}:T1`).local_edits).note, 1);
+});
+
+test('simplefin: an edited pending row hands its edits to the re-posted row and goes', async () => {
+  const d = db.getDb();
+  const checking = (d.prepare(`SELECT id FROM accounts WHERE connection_id = ? AND name LIKE 'Checking%'`).get(sfinId) as any).id;
+  const now = Math.floor(Date.now() / 1000);
+  const feed = (txs: any[]) => sfin._setSimplefinFetch(async () => json({ errlist: [], connections: [{ conn_id: 'CON-1', name: 'First Bank' }],
+    accounts: [{ id: 'ACT-1', name: 'Checking 1234', conn_id: 'CON-1', currency: 'USD', balance: '1490.26', 'balance-date': now, transactions: txs }] }));
+  feed([{ id: 'P1', posted: 0, transacted_at: now - 3600, amount: '-61.20', description: 'SHELL OIL', pending: true }]);
+  d.prepare('UPDATE connections SET last_attempt = NULL WHERE id = ?').run(sfinId);
+  await sync.syncAll({ connection_id: sfinId, force: true });
+  await tools.runTool('update_transaction', { transaction_id: `${checking}:P1`, category_id: 'keel:gas', reviewed: true });
+  feed([{ id: 'P1-posted', posted: now, amount: '-61.20', description: 'SHELL OIL 123' }]);
+  d.prepare('UPDATE connections SET last_attempt = NULL WHERE id = ?').run(sfinId);
+  await sync.syncAll({ connection_id: sfinId, force: true });
+  assert.equal(tx(`${checking}:P1`), undefined, 'no double-counted pending twin');
+  assert.equal(tx(`${checking}:P1-posted`).category_id, 'keel:gas');
+  assert.equal(tx(`${checking}:P1-posted`).reviewed, 1);
+});
+
+test('simplefin: a partial failure keeps the last good sync time', async () => {
+  const d = db.getDb();
+  const before = conns.getConnection(sfinId).last_synced;
+  sfin._setSimplefinFetch(async () => json({ errlist: [{ code: 'con.auth', msg: 'x', conn_id: 'CON-1' }], connections: [{ conn_id: 'CON-1', name: 'First Bank' }], accounts: [] }));
+  d.prepare('UPDATE connections SET last_attempt = NULL WHERE id = ?').run(sfinId);
+  const r = await sync.syncAll({ connection_id: sfinId, force: true });
+  assert.equal(r.connections[0].status, 'needs_reauth');
+  assert.equal(conns.getConnection(sfinId).last_synced, before);
 });
 
 test('simplefin: 403 marks the connection for a new token', async () => {
@@ -275,12 +323,16 @@ test('switching a Copilot account to a connection stops double counting', async 
     { id: 'cop-new', date: '2026-10-20', name: 'New', amount: 11, account_id: 'cop-cc', source: 'copilot' },
   ]);
   db.upsert('balance_history', [{ date: '2026-09-01', account_id: 'cop-cc', balance: 300 }], ['date', 'account_id']);
+  db.upsert('transactions', [{ id: 'cash-1', date: '2026-10-20', name: 'Cash tip', amount: 5, account_id: 'cop-cc', source: 'manual' }]);
+  db.upsert('holdings', [{ id: 'cop-h', account_id: 'cop-cc', ticker: 'X', name: 'X', value: 1 }]);
   const dup = enrich.duplicateCandidates(plaidId);
   assert.deepEqual(dup.map((x: any) => [x.account_id, x.copilot_account_id]), [['plaid:cc', 'cop-cc']]);
   const r = await tools.runTool('switch_account_to_connection', { account_id: 'plaid:cc', copilot_account_id: 'cop-cc', from: '2026-10-01' });
   assert.equal(r.dropped_copilot, 1);
   assert.ok(tx('cop-old'));
   assert.equal(tx('cop-new'), undefined);
+  assert.ok(tx('cash-1'), 'manual entries on the Copilot account are kept');
+  assert.ok(!d.prepare(`SELECT 1 FROM holdings WHERE account_id = 'cop-cc'`).get(), 'no double-counted holdings');
   assert.ok(!d.prepare(`SELECT 1 FROM transactions WHERE account_id = 'plaid:cc' AND date < '2026-10-01'`).get());
   assert.equal(enrich.supersededCutoffs().get('cop-cc'), '2026-10-01');
   assert.equal(enrich.takeoverDate('plaid:cc'), '2026-10-01');

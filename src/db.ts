@@ -141,7 +141,8 @@ function migrate(d: Database.Database): void {
 /** The database holds bank-access tokens once connections exist: keep it readable by this user only. */
 function lockDown(): void {
   try {
-    fs.chmodSync(path.dirname(config.dbPath), 0o700);
+    // Only Keel's own data/ folder; a KEEL_DB pointing into ~ or a shared folder leaves that folder alone.
+    if (path.dirname(config.dbPath) === path.resolve('data')) fs.chmodSync(path.dirname(config.dbPath), 0o700);
     for (const f of [config.dbPath, `${config.dbPath}-wal`, `${config.dbPath}-shm`]) if (fs.existsSync(f)) fs.chmodSync(f, 0o600);
   } catch {
     // best effort (e.g. a read-only or foreign-owned directory)

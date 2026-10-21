@@ -4,7 +4,7 @@
  * the sync_now tool, the CLI and the Mac app's Sync Now all call syncAll().
  */
 import { config } from '../config.js';
-import { getDb, nowIso, setMeta } from '../db.js';
+import { getDb, getMeta, nowIso, setMeta } from '../db.js';
 import { getConnection, listConnectionRows, updateConnection, type ConnectionRow, type ConnectionStatus, type ProviderId } from './connections.js';
 import { syncFromCopilot, type SyncReport as CopilotReport } from './copilot.js';
 import { backfillBalances, categorizeFromHistory, ensureCategories, matchTransfers, snapshotBalances } from './enrich.js';
@@ -41,13 +41,22 @@ export interface SyncOptions {
   force?: boolean;
 }
 
-let running: Promise<SyncReport> | null = null;
+let tail: Promise<unknown> = Promise.resolve();
+const queued = new Map<string, Promise<SyncReport>>();
 
-/** One sync at a time; a call during a run gets that run's report. */
+/**
+ * One sync at a time. A call identical to one already waiting or running shares its report; a different
+ * one (say, the first sync of a just-added connection during a scheduled run) queues behind it.
+ */
 export function syncAll(opts: SyncOptions = {}): Promise<SyncReport> {
-  if (running) return running;
-  running = run(opts).finally(() => (running = null));
-  return running;
+  const key = JSON.stringify([opts.connection_id ?? null, opts.provider ?? null, Boolean(opts.force)]);
+  const same = queued.get(key);
+  if (same) return same;
+  const p = tail.then(() => run(opts));
+  tail = p.catch(() => {});
+  queued.set(key, p);
+  p.then(() => queued.delete(key), () => queued.delete(key));
+  return p;
 }
 
 function due(c: ConnectionRow, p: DirectProvider, force: boolean): string | null {
@@ -72,11 +81,14 @@ async function syncConnection(c: ConnectionRow, force: boolean): Promise<Connect
     const r = await p.sync(getConnection(c.id));
     const counts = { ...r.counts };
     counts.categorized = categorizeFromHistory(c.id);
-    counts.transfers = matchTransfers(c.id);
+    // A first sync brings up to two years of history: pair transfers across all of it.
+    counts.transfers = matchTransfers(c.id, c.last_synced ? 60 : 800);
     snapshotBalances(c.id);
     backfillBalances(c.id);
     const status = r.status ?? 'ok';
-    updateConnection(c.id, { status, error: r.error ?? null, last_synced: started });
+    // While a bank behind the connection needs a new login, keep the last good sync time, so the next
+    // good sync asks for everything since then (SimpleFIN fetches from a week before last_synced).
+    updateConnection(c.id, status === 'ok' ? { status, error: null, last_synced: started } : { status, error: r.error ?? null });
     const fresh = getConnection(c.id);
     return { ...base, institution: fresh.institution, status, error: r.error ? redact(r.error) : null, counts, warnings: r.warnings.map(redact) };
   } catch (e) {
@@ -120,7 +132,9 @@ async function run(opts: SyncOptions): Promise<SyncReport> {
   }
 
   report.finishedAt = nowIso();
-  if (anything) setMeta('last_sync', report.finishedAt);
-  setMeta('last_sync_report', JSON.stringify(report));
+  // "Synced …" means everything was synced: a single connection only sets it when nothing ever has.
+  const full = !opts.connection_id && !opts.provider;
+  if (anything && (full || !getMeta('last_sync'))) setMeta('last_sync', report.finishedAt);
+  if (full) setMeta('last_sync_report', JSON.stringify(report));
   return report;
 }

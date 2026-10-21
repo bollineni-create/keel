@@ -168,5 +168,5 @@ async function remove(c, deleteData) {
   const what = deleteData ? 'and delete its accounts and transactions from Keel' : '(its accounts stay in Keel as manual accounts)';
   const extra = c.provider === 'plaid' ? ' Plaid’s free Trial doesn’t give the slot back.' : '';
   if (!confirm(`Disconnect ${c.institution || providerLabel(c.provider)} ${what}?${extra}`)) return;
-  try { await api(`/connections/${encodeURIComponent(c.id)}${deleteData ? '?delete_data=1' : ''}`, { method: 'DELETE' }); toast('Disconnected'); } catch (e) { alert(e.message); }
+  try { const r = await api(`/connections/${encodeURIComponent(c.id)}${deleteData ? '?delete_data=1' : ''}`, { method: 'DELETE' }); r.warning ? alert(r.warning) : toast('Disconnected'); } catch (e) { alert(e.message); }
 }

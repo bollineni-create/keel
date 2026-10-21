@@ -86,7 +86,8 @@ async function getAccounts(access: string, params: Record<string, string | numbe
 /** Date windows to fetch: a 90-day backfill on first sync, else from a week before the last sync. */
 export function windows(lastSynced: string | null, now = new Date()): Array<[string, string]> {
   const end = new Date(now.getTime() + 86400000);
-  const start = lastSynced ? new Date(Date.parse(lastSynced) - 7 * 86400000) : new Date(now.getTime() - BACKFILL_DAYS * 86400000);
+  const earliest = now.getTime() - BACKFILL_DAYS * 86400000;
+  const start = new Date(lastSynced ? Math.max(earliest, Date.parse(lastSynced) - 7 * 86400000) : earliest);
   const out: Array<[string, string]> = [];
   for (let s = start; s < end; ) {
     const e = new Date(Math.min(end.getTime(), s.getTime() + WINDOW_DAYS * 86400000));
@@ -106,14 +107,17 @@ function num(v: unknown): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-/** SimpleFIN has no account type: infer one from the names, then the balance sign. */
-export function guessType(name: string, institution: string | null, balance: number): string {
-  const t = `${name} ${institution ?? ''}`.toLowerCase();
-  if (/credit|card|visa|mastercard|amex|american express|discover|sapphire|freedom|venture|quicksilver/.test(t)) return 'credit';
-  if (/loan|mortgage|heloc|auto finance|student/.test(t)) return 'loan';
-  const typed = normalizeAccountType(t);
-  if (typed === 'investment' || typed === 'depository') return typed;
-  if (/brokerage|individual|joint|trust|crypto|coinbase|robinhood|fidelity|vanguard|schwab|wealthfront|betterment/.test(t)) return 'investment';
+/**
+ * SimpleFIN has no account type: infer one from the account's own name (never the institution's:
+ * "Navy Federal Credit Union" or "Discover Bank" say nothing about the account), then the balance sign.
+ * A wrong guess is fixed with update_account, which also rebuilds the account's balance history.
+ */
+export function guessType(name: string, _institution: string | null, balance: number): string {
+  const t = name.toLowerCase().replace(/credit union/g, '');
+  if (/\b(checking|savings|money market|debit|share draft|cash management|cd)\b/.test(t)) return 'depository';
+  if (/\b(credit card|credit|visa|mastercard|master card|amex|american express)\b/.test(t) || /\bcard\b/.test(t)) return 'credit';
+  if (/\b(loan|mortgage|heloc|line of credit)\b/.test(t)) return 'loan';
+  if (normalizeAccountType(t) === 'investment' || /\b(brokerage|individual|joint|trust|crypto|stocks?)\b/.test(t)) return 'investment';
   return balance < 0 ? 'credit' : 'depository';
 }
 
@@ -156,6 +160,9 @@ export function mapSimplefinAccount(a: Json, conn: ConnectionRow, institution: s
     balance_date: date ? new Date(date * 1000).toISOString() : nowIso(),
   };
 }
+
+/** What a re-posted row inherits from the pending row it replaces. */
+const CARRY = ['category_id', 'reviewed', 'excluded', 'note', 'tags', 'goal_id', 'transfer', 'income', 'local_edits'];
 
 const clean = (s: string) => s.replace(/\s{2,}/g, ' ').replace(/\b(POS|DEBIT|PURCHASE|CHECKCARD|CARD)\b\s*/gi, '').trim();
 
@@ -245,11 +252,20 @@ export const simplefinProvider: DirectProvider = {
         d.transaction(() => {
           upsert('transactions', rows, ['id'], { preserveEdited: true, insertOnly: ['transfer', 'income'] });
           for (const r of rows) seenTx.add(String(r.id));
-          // Pending rows re-post under new ids: drop pending rows in this window the Bridge no longer returns.
+          // Pending rows re-post under new ids: drop pending rows in this window the Bridge no longer returns,
+          // first handing what the user did to one (category, review, note…) to the row that replaced it.
           const ids = new Set(rows.map((r) => String(r.id)));
-          const stale = (d.prepare(`SELECT id FROM transactions WHERE account_id = ? AND pending = 1 AND date BETWEEN ? AND ? AND local_edits IS NULL`).all(id, start, end) as Array<{ id: string }>).filter((r) => !ids.has(r.id));
-          const del = d.prepare('DELETE FROM transactions WHERE id = ?');
-          for (const r of stale) counts.removed += del.run(r.id).changes;
+          const stale = (d.prepare(`SELECT id, amount, date, local_edits FROM transactions WHERE account_id = ? AND pending = 1 AND date BETWEEN ? AND ?`).all(id, start, end) as Array<{ id: string; amount: number; date: string; local_edits: string | null }>).filter((r) => !ids.has(r.id));
+          const del = d.prepare('DELETE FROM transactions WHERE id = ? OR split_parent_id = ?');
+          const carry = d.prepare(`UPDATE transactions SET (${CARRY.join(', ')}) = (SELECT ${CARRY.join(', ')} FROM transactions p WHERE p.id = ?) WHERE id = ? AND local_edits IS NULL`);
+          const claimed = new Set<string>();
+          for (const r of stale) {
+            if (r.local_edits) {
+              const twin = rows.find((x) => !claimed.has(String(x.id)) && !x.pending && Math.abs(Number(x.amount) - r.amount) < 0.005 && Math.abs(Date.parse(String(x.date)) - Date.parse(r.date)) <= 5 * 86400000);
+              if (twin) { carry.run(r.id, twin.id); claimed.add(String(twin.id)); }
+            }
+            counts.removed += del.run(r.id, r.id).changes;
+          }
         })();
         if (Array.isArray(a.holdings) && a.holdings.length) {
           const hs: Row[] = a.holdings.map((h: Json) => ({

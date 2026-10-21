@@ -45,6 +45,27 @@ Both need a browser (Chrome/Safari/Firefox) logged in to app.copilot.money; the
 server reuses that session. Without `--write`, edits you make in Keel apply locally and
 are queued (Settings shows the count).
 
+## The Mac app
+
+`app/macos` wraps Keel in a native window with its own menus and Dock icon, like
+Palimpsest's Mac app. It starts Keel's server from this folder when you open it (or uses
+one that's already running) and stops it when you quit.
+
+```bash
+npm run app                          # builds build/Keel.app and installs it in /Applications
+./app/macos/build.sh --no-install    # builds only
+```
+
+It needs Xcode's command line tools (`xcode-select --install`) and Node.js 20+. Your data
+stays in `data/` in this folder, and `.env` is read as usual. Edits under `web/` reload
+the window; edits under `src/` restart the server. If the folder moves, rebuild. The
+build is ad-hoc signed, so on another Mac right-click → **Open** the first time. The
+server log is at `~/Library/Logs/Keel/server.log` (Server → Show Server Log).
+
+Quitting the app stops the server it started, so your phone and the MCP endpoint go
+offline too. To keep them up, run the server with launchd (below); the app then just
+connects to it.
+
 ## Phone
 
 1. Set `HOST=0.0.0.0` (default) and a `KEEL_TOKEN` in `.env`.
@@ -112,6 +133,7 @@ web/app.js         buildless PWA shell: sidebar, panes, tab bar, ⌘K palette, r
 web/transactions.js the Transactions screen (windowed list, filters, bulk bar, detail pane)
 web/v1.js          v1 screens not yet migrated to the three-pane specs
 web/lib.js         shared helpers (format, API, icons, popover, sheet)
+app/macos/         native Mac app (Swift, WKWebView) that runs the server: npm run app
 design/            design-system mirror: tokens.json → web/tokens.css, components.css (served as /components.css)
 data/keel.db       your data (SQLite). Back this up; delete it to start over.
 ```

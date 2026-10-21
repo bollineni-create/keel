@@ -17,7 +17,8 @@
     "demo": "tsx src/cli.ts demo",
     "mcp": "tsx src/mcp-stdio.ts",
     "tokens": "node scripts/tokens-to-css.mjs",
-    "wireframes": "node scripts/wireframes.mjs"
+    "wireframes": "node scripts/wireframes.mjs",
+    "app": "./app/macos/build.sh"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.52.0",

@@ -84,11 +84,11 @@ Investments `trending-up` · Categories `tags` · Recurrings `repeat` · Setting
 the institution logo when the data has one, else the first letter on `bg-300`. Category
 emoji come from the data and are never replaced.
 
-**App icon.** A solid white **D** on `brand`, with two short rounded lines cut out of it: a
-daybook's first entries. One flat shape, no outlines or frames. It always uses light-theme
-`brand` (`#117a58`), in both themes, because dark `brand` is too pale behind white. The Mac app
-draws the same mark in the macOS squircle. The master is `web/icon.svg` in the repo;
-`app/macos/make_icon.swift` redraws it for macOS.
+**App icon.** A book seen from its spine: a rounded white spine bar, a 2.5-unit gap, then the
+pages as a half-round, so together they make a **D**. White on light-theme `brand` (`#117a58`) in
+both themes, because dark `brand` is too pale behind white. It's two flat shapes with no outlines,
+lines or frames. At favicon size the gap closes up and it reads as a solid D. The master is
+`web/icon.svg` in the repo; `app/macos/make_icon.swift` redraws it for macOS.
 (The app was called Keel until October 2026.)
 
 ## Components

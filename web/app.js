@@ -1,12 +1,15 @@
 // Daybook PWA — buildless ES modules. This file is the shell (docs/screens/shell.md): sidebar, panes,
-// title bars, phone tab bar + More sheet, ⌘K palette, keyboard, and the hash router.
+// title bars, the assistant dock, phone tab bar + More sheet, ⌘K palette, keyboard, and the hash router.
 import { $, $$, h, esc, moneyShort, txAmount, ago, api, cached, invalidate, store, toast, isTyping, isMac, hue, catTag, I, titleBar, iconBtn, sheet, closeTopSheet, closePopover } from './lib.js';
 import { screens as v1, bindShell } from './v1.js';
 import { transactionsScreen } from './transactions.js';
+import { assistantScreen, mountDock, unmountDock } from './assistant.js';
 import { bindConnections } from './connections.js';
 
+// The assistant is the front door (docs/screens/assistant.md): home route, ⌘1, first tab, and a dock on every other screen.
 const NAV = [
-  { path: '/', label: 'Dashboard', icon: I.dashboard },
+  { path: '/', label: 'Assistant', icon: I.sparkle },
+  { path: '/dashboard', label: 'Dashboard', icon: I.dashboard },
   { path: '/transactions', label: 'Transactions', icon: I.list },
   { path: '/goals', label: 'Goals', icon: I.flag },
   { path: '/cashflow', label: 'Cash flow', icon: I.cashflow },
@@ -14,10 +17,10 @@ const NAV = [
   { path: '/investments', label: 'Investments', icon: I.trending },
   { path: '/categories', label: 'Categories', icon: I.tags },
   { path: '/recurrings', label: 'Recurrings', icon: I.repeat },
-  { path: '/assistant', label: 'Assistant', icon: I.chat },
 ];
-const TABS = ['/', '/transactions', '/categories', '/accounts', '/assistant'];
-const ALIASES = { '/home': '/', '/budgets': '/categories', '/recurring': '/recurrings', '/cash-flow': '/cashflow' };
+const TABS = ['/', '/dashboard', '/transactions', '/categories', '/accounts'];
+const ALIASES = { '/assistant': '/', '/home': '/dashboard', '/budgets': '/categories', '/recurring': '/recurrings', '/cash-flow': '/cashflow' };
+const DOCK_KEY = 'keel-dock';
 const ACCOUNT_GROUPS = [['credit', 'Credit cards'], ['depository', 'Depository'], ['investment', 'Investments'], ['loan', 'Loans'], ['other', 'Other']];
 const HELP_URL = 'https://github.com/bollineni-create/keel#readme';
 const mod = isMac ? '⌘' : 'Ctrl+';
@@ -28,7 +31,7 @@ let current = null, navToken = 0, status = null;
 // ---------- sidebar ----------
 function renderStatic() {
   $('#sidebar').innerHTML = `
-    <div class="sidebar__controls">${iconBtn(I.back, 'Back', 'data-win="back"')}${iconBtn(I.forward, 'Forward', 'data-win="forward"')}${iconBtn(I.refresh, 'Refresh', 'data-win="refresh"')}</div>
+    <div class="sidebar__controls">${iconBtn(I.back, 'Back', 'data-win="back"')}${iconBtn(I.forward, 'Forward', 'data-win="forward"')}${iconBtn(I.refresh, 'Refresh', 'data-win="refresh"')}<span class="sidebar__spacer"></span>${iconBtn(I.chat, `Ask Daybook (${mod}J)`, 'data-act="dock" id="dock-toggle"')}</div>
     <button class="k-search sidebar__search" data-act="palette" aria-label="Search (${mod}K)">${I.search}<span class="k-input">Search<kbd>${mod}K</kbd></span></button>
     <nav class="k-nav sidebar__nav" id="nav" aria-label="Primary"></nav>
     <div class="sidebar__accounts" id="accounts" aria-label="My accounts"></div>
@@ -202,6 +205,26 @@ const shellApi = {
   detailOpen() { return content.classList.contains('has-detail') && !matchMedia('(min-width: 1100px)').matches; },
 };
 
+// ---------- assistant dock ----------
+const currentPath = () => ALIASES[(location.hash.replace(/^#/, '') || '/').split('?')[0]] ?? (location.hash.replace(/^#/, '') || '/').split('?')[0];
+const screenName = () => NAV.find((n) => n.path === currentPath())?.label ?? 'Daybook';
+/** The dock shows beside every screen but the Assistant itself (which is the same conversation, full size). */
+function applyDock() {
+  const wanted = store.get(DOCK_KEY, false);
+  const open = wanted && currentPath() !== '/' && matchMedia('(min-width: 900px)').matches;
+  app.classList.toggle('has-dock', open);
+  $('#dock-toggle')?.classList.toggle('is-on', wanted);
+  if (open) mountDock($('#dock'), { screenName });
+  else unmountDock();
+}
+function toggleDock() {
+  if (currentPath() === '/') { current?.focus?.(); return; }
+  if (!matchMedia('(min-width: 900px)').matches) { location.hash = '#/'; return; }
+  store.set(DOCK_KEY, !store.get(DOCK_KEY, false));
+  applyDock();
+  if (app.classList.contains('has-dock')) setTimeout(() => $('#dock .chat__input')?.focus(), 0);
+}
+
 // ---------- router ----------
 async function navigate() {
   const token = ++navToken;
@@ -214,11 +237,22 @@ async function navigate() {
   const nav = NAV.find((n) => n.path === path);
   renderNav(path);
   $$('#accounts .k-acctnav').forEach((a) => a.classList.toggle('is-active', a.getAttribute('href') === `#/transactions?accounts=${encodeURIComponent(currentAccountFilter() ?? '')}`));
+  closePopover();
+  document.title = path === '/' ? 'Daybook' : `${nav.label} · Daybook`;
+  applyDock();
+  // Switching conversations on the Assistant swaps the transcript in place; no need to rebuild the screen.
+  if (path === '/' && current?.update && content.classList.contains('content--chat')) { current.update(params); return; }
   current?.destroy?.();
   current = null;
-  closePopover();
-  document.title = `${nav.label} · Daybook`;
   try {
+    if (path === '/') {
+      content.className = 'content content--chat';
+      const scr = await assistantScreen(params, shellApi);
+      if (token !== navToken) return scr.destroy();
+      content.replaceChildren(scr.rail, scr.main);
+      current = scr;
+      return;
+    }
     if (path === '/transactions') {
       content.className = 'content content--split';
       const scr = await transactionsScreen(params, shellApi);
@@ -247,6 +281,7 @@ document.addEventListener('click', (e) => {
   if (act === 'settings') return openSettings();
   if (act === 'start') return openStartHere();
   if (act === 'more') return openMore();
+  if (act === 'dock') return toggleDock();
   const win = e.target.closest('[data-win]')?.dataset.win;
   if (win === 'back') return history.back();
   if (win === 'forward') return history.forward();
@@ -266,6 +301,7 @@ document.addEventListener('click', (e) => {
 document.addEventListener('keydown', (e) => {
   const mod_ = e.metaKey || e.ctrlKey;
   if (mod_ && e.key.toLowerCase() === 'k') { e.preventDefault(); return palette ? palette.close() : openPalette(); }
+  if (mod_ && e.key.toLowerCase() === 'j') { e.preventDefault(); return toggleDock(); }
   if (e.key === 'Escape') {
     if (closePopover()) return;
     if (palette) return palette.close();
@@ -280,6 +316,9 @@ document.addEventListener('keydown', (e) => {
 addEventListener('hashchange', navigate);
 addEventListener('online', renderStatus);
 addEventListener('offline', renderStatus);
+addEventListener('resize', applyDock);
+// The assistant may have categorized, reviewed or budgeted: refresh the chrome and any stateless screen underneath.
+addEventListener('keel:assistant-done', () => { refreshChrome(); if (!['/', '/transactions'].includes(currentPath())) navigate(); });
 bindShell({ navigate, refreshChrome });
 bindConnections(() => { refreshChrome(); navigate(); });
 renderStatic();

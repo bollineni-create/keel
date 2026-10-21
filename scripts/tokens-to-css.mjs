@@ -1,4 +1,4 @@
-// Generates web/tokens.css from design/tokens.json (the Keel design-system artifact's tokens file).
+// Generates web/tokens.css from design/tokens.json (the Daybook design-system artifact's tokens file).
 // Run: npm run tokens   — never edit web/tokens.css by hand.
 import fs from 'node:fs';
 import path from 'node:path';

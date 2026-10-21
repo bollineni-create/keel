@@ -1,13 +1,13 @@
-# Copilot Money → Keel: functional map
+# Copilot Money → Daybook: functional map
 
 A screen-by-screen specification of the Copilot Money Mac app (v. Oct 2026), captured from
-the live app, written so Claude Code can rebuild each screen in Keel with the same
+the live app, written so Claude Code can rebuild each screen in Daybook with the same
 information architecture, controls, states and interactions. Brand (name, logo, mark,
-Copilot's proprietary icon glyphs) is **not** reproduced; Keel uses its own name and the
+Copilot's proprietary icon glyphs) is **not** reproduced; Daybook uses its own name and the
 Lucide icon set in the same roles. Category emoji are Unicode and come through with the data.
 
 Each screen below lists: **Layout** · **Regions** (top→bottom, left→right) · **Controls** ·
-**States** · **Interactions** · **Data** (Keel API / tool that feeds it).
+**States** · **Interactions** · **Data** (Daybook API / tool that feeds it).
 
 ---
 
@@ -157,7 +157,7 @@ sheet.
 
 Sections: **Demo mode** · **Features** (Budgeting toggle, Tags ›) · **Connections** (Manage your connections ›) · **Appearance** (Dark mode: Automatic / Light / Dark) · **Copilot Labs** (Amazon, Venmo) · **Notifications** (Bank fee alert, Big expense alert, Budgets updates, Credit utilization alert, Income update, Low balance alert, Recurring paid alert, Spending update, Uncategorized transfer alert — toggles) · **Rollovers** (Enable rollovers) · Account / Export / Sign out.
 
-Keel equivalents: Data (sync, CSV import, write-through mode) · Assistant (API key status, model) · Appearance · Notifications (reuse list; delivered via the assistant/MCP) · MCP connection instructions.
+Daybook equivalents: Bank connections (Plaid / SimpleFIN, the Connections › equivalent) · Data (sync, CSV import, write-through mode) · Assistant (API key status, model) · Appearance · Notifications (reuse list; delivered via the assistant/MCP) · MCP connection instructions.
 
 ---
 

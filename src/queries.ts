@@ -28,11 +28,18 @@ export function daysLeftInMonth(month: string): number {
 export interface AccountRow {
   id: string; name: string; mask: string | null; type: string; subtype: string | null; institution: string | null;
   balance: number; available: number | null; limit_amt: number | null; currency: string; hidden: number; closed: number; updated_at: string;
+  /** copilot | plaid | simplefin | csv | manual */
+  source: string; connection_id: string | null; balance_date: string | null;
+  /** 1 when this account's bank login needs fixing (drives the "Verification needed" badge). */
+  needs_attention: number;
 }
 
 export function listAccounts(includeHidden = false, includeClosed = false): AccountRow[] {
-  const where = [includeClosed ? '' : 'closed = 0', includeHidden ? '' : 'hidden = 0'].filter(Boolean);
-  return getDb().prepare(`SELECT id,name,mask,type,subtype,institution,balance,available,limit_amt,currency,hidden,closed,updated_at FROM accounts ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY type, name`).all() as AccountRow[];
+  const where = [includeClosed ? '' : 'a.closed = 0', includeHidden ? '' : 'a.hidden = 0'].filter(Boolean);
+  return getDb().prepare(`SELECT a.id,a.name,a.mask,a.type,a.subtype,a.institution,a.balance,a.available,a.limit_amt,a.currency,a.hidden,a.closed,a.updated_at,
+      COALESCE(a.source,'copilot') source, a.connection_id, a.balance_date,
+      COALESCE(a.needs_attention, 0) needs_attention
+    FROM accounts a ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY a.type, a.name`).all() as AccountRow[];
 }
 
 export const LIABILITY_TYPES = new Set(['credit', 'loan']);
@@ -87,13 +94,15 @@ export type TxSort = 'date' | 'amount' | 'name';
 export interface TxFilter {
   start?: string; end?: string; month?: string; query?: string; category_id?: string; account_id?: string;
   min_amount?: number; max_amount?: number; pending?: boolean; unreviewed?: boolean; include_transfers?: boolean; include_excluded?: boolean;
+  /** Only rows with no category (e.g. new rows from a direct bank connection). */
+  uncategorized?: boolean;
   /** Multi-select filters: any of the listed values matches (OR within a filter, AND across filters). */
   account_ids?: string[]; category_ids?: string[]; tags?: string[]; types?: TxType[]; statuses?: TxStatus[];
   sort?: TxSort; dir?: 'asc' | 'desc';
   limit?: number; offset?: number;
 }
 
-/** Tags are stored as a JSON array of strings (Copilot's tag ids/names, or ones added in Keel). */
+/** Tags are stored as a JSON array of strings (Copilot's tag ids/names, or ones added in Daybook). */
 const TAGS_OF = (col: string) => `json_each(CASE WHEN json_valid(${col}) THEN ${col} ELSE '[]' END)`;
 
 export function txWhere(f: TxFilter): { sql: string; args: unknown[] } {
@@ -118,6 +127,7 @@ export function txWhere(f: TxFilter): { sql: string; args: unknown[] } {
   if (f.max_amount != null) { where.push('ABS(t.amount) <= ?'); args.push(f.max_amount); }
   if (f.pending != null) { where.push('t.pending = ?'); args.push(f.pending ? 1 : 0); }
   if (f.unreviewed) where.push('t.reviewed = 0');
+  if (f.uncategorized) where.push('t.category_id IS NULL AND t.split = 0');
   if (f.types?.length) {
     const any = f.types.map((ty) => (ty === 'transfer' ? 't.transfer = 1' : ty === 'income' ? '(t.transfer = 0 AND t.income = 1)' : '(t.transfer = 0 AND t.income = 0)'));
     where.push(`(${any.join(' OR ')})`);

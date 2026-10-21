@@ -1,7 +1,7 @@
 # Assistant
 
 Wireframe: `../visuals/assistant.svg`. Source audit: feature map §9 (Copilot's assistant) —
-in Keel the assistant is the **front door**: the home route (`#/`), `⌘1`, the first phone
+in Daybook the assistant is the **front door**: the home route (`#/`), `⌘1`, the first phone
 tab, and a dock beside every other screen (`⌘J`). It talks to the same tool registry
 (`src/tools.ts`) that Claude reaches over MCP, so what it can do here is exactly what
 Claude Desktop / Claude Code can do against `/mcp`.
@@ -25,7 +25,7 @@ full size) or under 900px (the Assistant tab is one tap away).
 `context` is what the user is looking at while asking, folded into the system prompt so
 "this" and "here" resolve. Closing the stream (Stop, closed tab) aborts the Anthropic
 call; any partial reply is saved so the transcript stays coherent.
-The reply is asked to link into the app with Keel routes (`[Dining this month](#/transactions?categories=…)`)
+The reply is asked to link into the app with Daybook routes (`[Dining this month](#/transactions?categories=…)`)
 using ids returned by tools; markdown-lite renders only `#/…` and `https://` hrefs.
 
 **States.** Not configured → `no API key` chip, sending shows the error with an

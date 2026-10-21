@@ -1,4 +1,4 @@
-/* Keel components — plain CSS classes over tokens.css. Loaded after tokens.css. */
+/* Daybook components — plain CSS classes over tokens.css. Loaded after tokens.css. */
 .k { font-family: var(--font-sans); color: var(--ink); font-size: 13px; line-height: 18px; -webkit-font-smoothing: antialiased; }
 .k * { box-sizing: border-box; }
 .k-mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }

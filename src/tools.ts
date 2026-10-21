@@ -6,15 +6,26 @@
  */
 import { z } from 'zod';
 import { zodToJsonSchema } from 'zod-to-json-schema';
-import { getDb, nowIso } from './db.js';
+import { config } from './config.js';
+import { getDb, markEdited, nowIso } from './db.js';
 import * as q from './queries.js';
-import { pushWrite, syncFromCopilot } from './sync/copilot.js';
+import { pushWrite } from './sync/copilot.js';
+import { connectionCount, deleteConnection, getConnection, listConnections, publicConnection } from './sync/connections.js';
+import { duplicateCandidates, rebuildBalanceHistory, supersedeAccount } from './sync/enrich.js';
+import { syncAll } from './sync/index.js';
+import { createLinkToken, exchangePublicToken, removeItem } from './sync/plaid.js';
+import { addSimplefinConnection, BRIDGE_URL } from './sync/simplefin.js';
 
 export interface Tool<S extends z.ZodTypeAny = z.ZodTypeAny> {
   name: string;
   description: string;
   schema: S;
   readOnly: boolean;
+  /**
+   * REST only: never offered to the assistant or over MCP. For tools that take or return bank
+   * credentials (setup tokens, Plaid tokens) or that add or remove a bank connection.
+   */
+  internal?: boolean;
   handler: (args: z.infer<S>) => Promise<unknown> | unknown;
 }
 
@@ -30,7 +41,7 @@ function def<S extends z.ZodTypeAny>(t: Tool<S>): Tool<S> {
 export const tools: Tool<any>[] = [
   def({
     name: 'get_overview',
-    description: 'Snapshot for today: this month\'s spend vs income vs budget, net worth, budgets at risk, recurring charges due in the next 14 days, and when data was last synced from Copilot. Start here for "how am I doing" questions.',
+    description: 'Snapshot for today: this month\'s spend vs income vs budget, net worth, budgets at risk, recurring charges due in the next 14 days, and when data was last synced. Start here for "how am I doing" questions.',
     schema: z.object({}),
     readOnly: true,
     handler: () => q.overview(),
@@ -56,6 +67,7 @@ export const tools: Tool<any>[] = [
       max_amount: z.number().optional(),
       pending: z.boolean().optional(),
       unreviewed: z.boolean().optional().describe('Only rows not yet marked reviewed'),
+      uncategorized: z.boolean().optional().describe('Only rows with no category (new rows from a bank connection often need one)'),
       include_transfers: z.boolean().optional(),
       include_excluded: z.boolean().optional(),
       account_ids: z.array(z.string()).optional().describe('Any of these accounts'),
@@ -94,7 +106,7 @@ export const tools: Tool<any>[] = [
   }),
   def({
     name: 'get_accounts',
-    description: 'All accounts with current balances, grouped by type (depository, credit, loan, investment, asset).',
+    description: 'All accounts with current balances, grouped by type (depository, credit, loan, investment, asset). source says where each comes from (copilot, plaid, simplefin, csv, manual); needs_attention = 1 means its bank login needs fixing.',
     schema: z.object({ include_hidden: z.boolean().optional() }),
     readOnly: true,
     handler: ({ include_hidden }) => ({ accounts: q.listAccounts(include_hidden ?? false), net_worth: q.netWorth() }),
@@ -204,7 +216,7 @@ export const tools: Tool<any>[] = [
   }),
   def({
     name: 'create_transaction',
-    description: 'Add a manual transaction (cash, something the bank missed). Stays in Keel; Copilot Money is not changed.',
+    description: 'Add a manual transaction (cash, something the bank missed). Stays in Daybook; Copilot Money is not changed.',
     schema: z.object({
       date: day,
       name: z.string().min(1),
@@ -226,7 +238,7 @@ export const tools: Tool<any>[] = [
   }),
   def({
     name: 'split_transaction',
-    description: 'Split one transaction into parts (e.g. a Target run that was half groceries, half household). Part amounts must add up to the original. The parent stays visible but drops out of totals; the parts carry the spend. An empty list removes the split. Local to Keel.',
+    description: 'Split one transaction into parts (e.g. a Target run that was half groceries, half household). Part amounts must add up to the original. The parent stays visible but drops out of totals; the parts carry the spend. An empty list removes the split. Local to Daybook.',
     schema: z.object({
       transaction_id: z.string(),
       splits: z.array(z.object({ amount: z.number(), category_id: z.string().optional(), name: z.string().optional() })).max(20),
@@ -253,7 +265,7 @@ export const tools: Tool<any>[] = [
   }),
   def({
     name: 'delete_transactions',
-    description: 'Delete transactions from Keel (and the parts of any split among them). A transaction that came from Copilot comes back on the next sync unless it is also deleted there; prefer excluding it.',
+    description: 'Delete transactions from Daybook (and the parts of any split among them). A transaction that came from Copilot comes back on the next sync unless it is also deleted there; prefer excluding it.',
     schema: z.object({ transaction_ids: txIds }),
     readOnly: false,
     handler: ({ transaction_ids }) => {
@@ -274,7 +286,9 @@ export const tools: Tool<any>[] = [
       const stmt = d.prepare('UPDATE transactions SET reviewed = ?, updated_at = ? WHERE id = ?');
       const tx = d.transaction((ids: string[]) => ids.forEach((id) => stmt.run(reviewed === false ? 0 : 1, nowIso(), id)));
       tx(transaction_ids);
-      const push = await pushWrite('review_transactions', { transaction_ids, reviewed: reviewed !== false });
+      const copilotIds = transaction_ids.filter(isCopilotRow);
+      const push: { pushed: boolean; local?: boolean; error?: string } = copilotIds.length ? await pushWrite('review_transactions', { transaction_ids: copilotIds, reviewed: reviewed !== false }) : { pushed: false, local: true };
+      for (const id of transaction_ids) if (!(push.pushed && copilotIds.includes(id))) markEdited('transactions', id, ['reviewed']);
       return { ok: true, count: transaction_ids.length, copilot: push };
     },
   }),
@@ -287,16 +301,134 @@ export const tools: Tool<any>[] = [
       const d = getDb();
       d.prepare('UPDATE categories SET budget_amount = ? WHERE id = ?').run(amount > 0 ? amount : null, category_id);
       d.prepare(`INSERT INTO budgets(id, category_id, amount, period) VALUES (?,?,?,'monthly') ON CONFLICT(id) DO UPDATE SET amount = excluded.amount`).run(`cat:${category_id}`, category_id, amount);
-      const push = await pushWrite('set_budget', { category_id, amount: String(amount) });
+      // Daybook's own starter categories (keel:…) don't exist in Copilot.
+      const push = category_id.startsWith('keel:') || !config.copilotEnabled ? { pushed: false, local: true } : await pushWrite('set_budget', { category_id, amount: String(amount) });
       return { ok: true, copilot: push };
     },
   }),
   def({
     name: 'sync_now',
-    description: 'Pull fresh data from Copilot Money into Keel. Takes a few seconds. Returns per-table counts and any warnings.',
-    schema: z.object({}),
+    description: 'Pull fresh data into Daybook from Copilot Money and every direct bank connection (or just one). Takes seconds to a minute. Returns per-table counts, a report per connection and any warnings. SimpleFIN connections sync at most every 30 minutes.',
+    schema: z.object({
+      connection_id: z.string().optional().describe('Only this bank connection (ids from get_connections)'),
+      provider: z.enum(['copilot', 'plaid', 'simplefin']).optional().describe('Only this source'),
+    }),
     readOnly: false,
-    handler: () => syncFromCopilot(),
+    handler: ({ connection_id, provider }) => syncAll({ connection_id, provider, force: true }),
+  }),
+  def({
+    name: 'get_connections',
+    description: 'Direct bank connections (Plaid, SimpleFIN): institution, status (ok / needs_reauth / error), last sync, error and accounts, plus Copilot accounts that look like the same real account (duplicates to switch over). Also says which providers are set up.',
+    schema: z.object({}),
+    readOnly: true,
+    handler: () => ({
+      connections: listConnections().map((c) => ({ ...c, duplicates: duplicateCandidates(c.id) })),
+      providers: { plaid: { configured: config.plaid.configured, env: config.plaid.env }, simplefin: { configured: true, bridge_url: BRIDGE_URL }, copilot: { enabled: config.copilotEnabled } },
+    }),
+  }),
+  def({
+    name: 'update_account',
+    description: 'Rename an account, correct its type (SimpleFIN guesses types from names), or hide or close it. Edits stay in Daybook and survive syncs.',
+    schema: z.object({
+      account_id: z.string(),
+      name: z.string().min(1).optional(),
+      type: z.enum(['depository', 'credit', 'loan', 'investment', 'asset', 'other']).optional(),
+      hidden: z.boolean().optional(),
+      closed: z.boolean().optional(),
+    }),
+    readOnly: false,
+    handler: ({ account_id, ...f }) => {
+      const d = getDb();
+      const cur = d.prepare('SELECT id, type, balance FROM accounts WHERE id = ?').get(account_id) as { id: string; type: string; balance: number } | undefined;
+      if (!cur) throw new Error(`No account ${account_id}`);
+      const cols = Object.entries(f).filter(([, v]) => v !== undefined);
+      if (!cols.length) throw new Error('Nothing to update');
+      d.prepare(`UPDATE accounts SET ${cols.map(([k]) => `${k} = ?`).join(', ')} WHERE id = ?`).run(...cols.map(([, v]) => (typeof v === 'boolean' ? (v ? 1 : 0) : v)), account_id);
+      // Daybook stores what's owed on cards and loans as a positive balance.
+      if (f.type && q.LIABILITY_TYPES.has(f.type) && cur.balance < 0) d.prepare('UPDATE accounts SET balance = ? WHERE id = ?').run(Math.abs(cur.balance), account_id);
+      markEdited('accounts', account_id, cols.map(([k]) => k));
+      // History walked back from transactions assumed the old type's sign.
+      if (f.type && f.type !== cur.type) rebuildBalanceHistory(account_id);
+      return { ok: true, account: q.listAccounts(true, true).find((a) => a.id === account_id) };
+    },
+  }),
+  def({
+    name: 'add_simplefin_connection',
+    description: 'Connect a SimpleFIN Bridge account from a one-time Setup Token, then run its first sync.',
+    schema: z.object({ setup_token: z.string().min(20) }),
+    readOnly: false,
+    internal: true,
+    handler: async ({ setup_token }) => {
+      const conn = await addSimplefinConnection(setup_token);
+      const sync = await syncAll({ connection_id: conn.id, force: true });
+      return { ok: true, connection: publicConnection(getConnection(conn.id)), duplicates: duplicateCandidates(conn.id), sync: sync.connections[0] ?? null };
+    },
+  }),
+  def({
+    name: 'plaid_create_link_token',
+    description: 'A short-lived token to open Plaid Link. Pass connection_id to repair that login (update mode) instead of adding a new one.',
+    schema: z.object({ connection_id: z.string().optional() }),
+    readOnly: true,
+    internal: true,
+    handler: ({ connection_id }) => createLinkToken(connection_id),
+  }),
+  def({
+    name: 'plaid_exchange_public_token',
+    description: 'Finish Plaid Link: store the new connection and run its first sync.',
+    schema: z.object({
+      public_token: z.string().min(10),
+      institution: z.object({ name: z.string().nullable().optional(), institution_id: z.string().nullable().optional() }).optional(),
+    }),
+    readOnly: false,
+    internal: true,
+    handler: async ({ public_token, institution }) => {
+      const { connection, duplicate_of } = await exchangePublicToken(public_token, institution);
+      const sync = await syncAll({ connection_id: connection.id, force: true });
+      return { ok: true, connection: publicConnection(getConnection(connection.id)), duplicate_of, duplicates: duplicateCandidates(connection.id), sync: sync.connections[0] ?? null };
+    },
+  }),
+  def({
+    name: 'connection_repaired',
+    description: 'After fixing a login (Plaid Link update mode, or on the SimpleFIN Bridge): clear the error and sync that connection.',
+    schema: z.object({ connection_id: z.string() }),
+    readOnly: false,
+    internal: true,
+    handler: async ({ connection_id }) => {
+      const c = getConnection(connection_id);
+      getDb().prepare(`UPDATE connections SET status = 'ok', error = NULL, last_attempt = NULL WHERE id = ?`).run(c.id);
+      getDb().prepare('UPDATE accounts SET needs_attention = 0 WHERE connection_id = ?').run(c.id);
+      const sync = await syncAll({ connection_id: c.id, force: true });
+      return { ok: true, connection: publicConnection(getConnection(c.id)), sync: sync.connections[0] ?? null };
+    },
+  }),
+  def({
+    name: 'remove_connection',
+    description: 'Disconnect a bank. delete_data also deletes its accounts and their transactions (and hands any account switched over from Copilot back to Copilot); otherwise the accounts stay as manual accounts with their history. For Plaid this also revokes the login at Plaid.',
+    schema: z.object({ connection_id: z.string(), delete_data: z.boolean().optional() }),
+    readOnly: false,
+    internal: true,
+    handler: async ({ connection_id, delete_data }) => {
+      const c = getConnection(connection_id);
+      let revoked = false, warning: string | undefined;
+      if (c.provider === 'plaid' && config.plaid.configured) {
+        // Offline, an outage or rotated keys must not trap the connection in Daybook.
+        try {
+          await removeItem(c);
+          revoked = true;
+        } catch (e) {
+          warning = `Removed from Daybook, but Plaid couldn't be told (${(e as Error).message}). Remove the Item from the Plaid dashboard to stop any billing.`;
+        }
+      }
+      return { ok: true, revoked, warning, removed: deleteConnection(c.id, Boolean(delete_data)), remaining: connectionCount() };
+    },
+  }),
+  def({
+    name: 'switch_account_to_connection',
+    description: 'Stop double counting when the same real account comes from both Copilot and a direct bank connection: from `from` (default today) the direct account supplies its transactions and balance and the Copilot account is hidden; Copilot keeps the history before that day.',
+    schema: z.object({ account_id: z.string().describe('The account from the bank connection'), copilot_account_id: z.string(), from: day.optional() }),
+    readOnly: false,
+    internal: true,
+    handler: ({ account_id, copilot_account_id, from }) => ({ ok: true, ...supersedeAccount(account_id, copilot_account_id, from) }),
   }),
 ];
 
@@ -305,8 +437,14 @@ type UpdateArgs = {
   tags?: string[]; type?: q.TxType; amount?: number; date?: string; account_id?: string; goal_id?: string | null;
 };
 
-/** Fields copilot-money-mcp's update_transaction accepts; everything else is Keel-local. */
+/** Fields copilot-money-mcp's update_transaction accepts; everything else is Daybook-local. */
 const PUSHABLE = ['category_id', 'reviewed', 'note', 'name'] as const;
+
+/** Only rows that came from Copilot are pushed back to it; bank-connection, CSV and manual rows stay in Daybook. */
+function isCopilotRow(id: string): boolean {
+  const r = getDb().prepare('SELECT source FROM transactions WHERE id = ?').get(id) as { source: string | null } | undefined;
+  return !r || r.source == null || r.source === 'copilot';
+}
 
 async function updateTransaction(a: UpdateArgs) {
   const d = getDb();
@@ -328,12 +466,19 @@ async function updateTransaction(a: UpdateArgs) {
   sets.push('updated_at = ?'); vals.push(nowIso());
   const r = d.prepare(`UPDATE transactions SET ${sets.join(', ')} WHERE id = ?`).run(...vals, a.transaction_id);
   if (!r.changes) throw new Error(`No transaction ${a.transaction_id}`);
-  const pushable = Object.fromEntries(PUSHABLE.filter((k) => a[k] !== undefined).map((k) => [k, a[k]]));
-  const push = Object.keys(pushable).length ? await pushWrite('update_transaction', { transaction_id: a.transaction_id, ...pushable }) : { pushed: false, local: true };
-  return { ok: true, transaction: q.getTransaction(a.transaction_id), copilot: push as { pushed: boolean; local?: boolean; error?: string } };
+  const fromCopilot = isCopilotRow(a.transaction_id);
+  const pushable = fromCopilot ? Object.fromEntries(PUSHABLE.filter((k) => a[k] !== undefined).map((k) => [k, a[k]])) : {};
+  const push: { pushed: boolean; local?: boolean; error?: string } = Object.keys(pushable).length ? await pushWrite('update_transaction', { transaction_id: a.transaction_id, ...pushable }) : { pushed: false, local: true };
+  // Everything not now in Copilot is a Daybook-side edit the next sync must keep.
+  const edited = sets.slice(0, -1).map((x) => x.split(' ')[0]).filter((c) => c !== 'goal_id' && !(push.pushed && c in pushable));
+  markEdited('transactions', a.transaction_id, edited);
+  return { ok: true, transaction: q.getTransaction(a.transaction_id), copilot: push };
 }
 
 export const toolMap = new Map(tools.map((t) => [t.name, t]));
+
+/** What the assistant and MCP clients may call. */
+export const publicTools = tools.filter((t) => !t.internal);
 
 export async function runTool(name: string, rawArgs: unknown): Promise<unknown> {
   const t = toolMap.get(name);
@@ -345,7 +490,7 @@ export async function runTool(name: string, rawArgs: unknown): Promise<unknown> 
 
 /** Anthropic Messages API tool definitions. */
 export function anthropicTools() {
-  return tools.map((t) => ({ name: t.name, description: t.description, input_schema: stripSchema(zodToJsonSchema(t.schema, { $refStrategy: 'none' })) }));
+  return publicTools.map((t) => ({ name: t.name, description: t.description, input_schema: stripSchema(zodToJsonSchema(t.schema, { $refStrategy: 'none' })) }));
 }
 
 function stripSchema(s: any): any {

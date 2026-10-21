@@ -1,6 +1,6 @@
 // App-shell cache; API calls always go to the network.
-const CACHE = 'keel-shell-v4';
-const SHELL = ['/', '/index.html', '/tokens.css', '/components.css', '/styles.css', '/app.js', '/lib.js', '/transactions.js', '/assistant.js', '/v1.js', '/manifest.webmanifest', '/icon.svg'];
+const CACHE = 'keel-shell-v7';
+const SHELL = ['/', '/index.html', '/tokens.css', '/components.css', '/styles.css', '/app.js', '/lib.js', '/transactions.js', '/assistant.js', '/connections.js', '/v1.js', '/manifest.webmanifest', '/icon.svg'];
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
 });

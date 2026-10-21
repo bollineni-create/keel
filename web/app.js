@@ -1,9 +1,10 @@
-// Keel PWA — buildless ES modules. This file is the shell (docs/screens/shell.md): sidebar, panes,
+// Daybook PWA — buildless ES modules. This file is the shell (docs/screens/shell.md): sidebar, panes,
 // title bars, the assistant dock, phone tab bar + More sheet, ⌘K palette, keyboard, and the hash router.
 import { $, $$, h, esc, moneyShort, txAmount, ago, api, cached, invalidate, store, toast, isTyping, isMac, hue, catTag, I, titleBar, iconBtn, sheet, closeTopSheet, closePopover } from './lib.js';
 import { screens as v1, bindShell } from './v1.js';
 import { transactionsScreen } from './transactions.js';
 import { assistantScreen, mountDock, unmountDock } from './assistant.js';
+import { bindConnections } from './connections.js';
 
 // The assistant is the front door (docs/screens/assistant.md): home route, ⌘1, first tab, and a dock on every other screen.
 const NAV = [
@@ -30,7 +31,7 @@ let current = null, navToken = 0, status = null;
 // ---------- sidebar ----------
 function renderStatic() {
   $('#sidebar').innerHTML = `
-    <div class="sidebar__controls">${iconBtn(I.back, 'Back', 'data-win="back"')}${iconBtn(I.forward, 'Forward', 'data-win="forward"')}${iconBtn(I.refresh, 'Refresh', 'data-win="refresh"')}<span class="sidebar__spacer"></span>${iconBtn(I.chat, `Ask Keel (${mod}J)`, 'data-act="dock" id="dock-toggle"')}</div>
+    <div class="sidebar__controls">${iconBtn(I.back, 'Back', 'data-win="back"')}${iconBtn(I.forward, 'Forward', 'data-win="forward"')}${iconBtn(I.refresh, 'Refresh', 'data-win="refresh"')}<span class="sidebar__spacer"></span>${iconBtn(I.chat, `Ask Daybook (${mod}J)`, 'data-act="dock" id="dock-toggle"')}</div>
     <button class="k-search sidebar__search" data-act="palette" aria-label="Search (${mod}K)">${I.search}<span class="k-input">Search<kbd>${mod}K</kbd></span></button>
     <nav class="k-nav sidebar__nav" id="nav" aria-label="Primary"></nav>
     <div class="sidebar__accounts" id="accounts" aria-label="My accounts"></div>
@@ -65,7 +66,7 @@ async function renderAccounts({ fresh = false } = {}) {
         <div class="acct-group__rows" ${open ? '' : 'hidden'}>${rows.map((a) => `<a class="k-acctnav ${a.hidden || a.closed ? 'k-acctnav--closed' : ''} ${a.id === activeAcct ? 'is-active' : ''}" href="#/transactions?accounts=${encodeURIComponent(a.id)}" title="${esc(a.name)}${a.mask ? ' ··' + esc(a.mask) : ''}${a.closed ? ' (closed)' : a.hidden ? ' (hidden)' : ''}">
           <i class="k-acctnav__dot" style="background:var(--cat-${hue(a.id)})"></i><span class="k-acctnav__name">${esc(a.name)}</span><span class="k-acctnav__bal">${moneyShort(a.balance)}</span></a>`).join('')}</div></div>`;
     }).join('');
-    box.innerHTML = `<div class="k-eyebrow sidebar__eyebrow">My accounts</div>${groups || `<p class="body-sm sidebar__hint">Accounts appear after your first sync.</p>`}`;
+    box.innerHTML = `<div class="k-eyebrow sidebar__eyebrow">My accounts</div>${groups || `<p class="body-sm sidebar__hint">Accounts appear after you connect a bank or sync Copilot.</p>`}`;
   } catch {
     box.innerHTML = '<div class="k-eyebrow sidebar__eyebrow">My accounts</div>';
   }
@@ -83,8 +84,9 @@ async function renderStatus() {
     if (!navigator.onLine) throw new Error('offline');
     status = await api('/status');
     const stale = !status.last_sync || Date.now() - Date.parse(status.last_sync) > 6 * 3600e3;
-    el.innerHTML = `<i class="dot ${stale ? 'dot--warning' : 'dot--ok'}"></i><span>Synced ${ago(status.last_sync)}${status.queued_writes ? ` · ${status.queued_writes} queued` : ''}</span>`;
-    el.classList.toggle('is-stale', stale);
+    const attention = status.connections?.needs_attention ?? 0;
+    el.innerHTML = `<i class="dot ${stale || attention ? 'dot--warning' : 'dot--ok'}"></i><span>Synced ${ago(status.last_sync)}${status.queued_writes ? ` · ${status.queued_writes} queued` : ''}${attention ? ` · ${attention} need${attention === 1 ? 's' : ''} attention` : ''}</span>`;
+    el.classList.toggle('is-stale', stale || attention > 0);
     const steps = await onboarding();
     $('#start-dot').hidden = steps.every((s) => s.done);
   } catch {
@@ -100,11 +102,11 @@ async function onboarding() {
   const summary = await api('/summary').catch(() => ({ unreviewed: 0 }));
   const manual = store.get('keel-onboarding', {});
   return [
-    { id: 'sync', label: 'Sync your Copilot data', hint: 'Pull accounts and transactions from the Copilot Mac app.', done: Boolean(s.last_sync), action: ['Open settings', openSettings] },
+    { id: 'sync', label: 'Connect your accounts', hint: 'Link banks with Plaid or SimpleFIN, or sync from the Copilot Mac app.', done: Boolean(s.last_sync), action: ['Open settings', openSettings] },
     { id: 'review', label: 'Review your transactions', hint: summary.unreviewed ? `${summary.unreviewed} waiting.` : 'All caught up.', done: !summary.unreviewed, action: ['Review', () => (location.hash = '#/transactions?statuses=unreviewed')] },
     { id: 'budget', label: 'Set a budget', hint: 'Give at least one category a monthly budget.', done: s.counts.budgets > 0, action: ['Categories', () => (location.hash = '#/categories')] },
     { id: 'mcp', label: 'Connect Claude over MCP', hint: 'Claude Desktop, Claude Code or claude.ai can read and edit your finances.', done: Boolean(manual.mcp), manual: true, action: ['Show me how', openSettings] },
-    { id: 'phone', label: 'Add Keel to your phone', hint: 'Open Keel in Safari on your phone, then Share → Add to Home Screen.', done: Boolean(manual.phone), manual: true },
+    { id: 'phone', label: 'Add Daybook to your phone', hint: 'Open Daybook in Safari on your phone, then Share → Add to Home Screen.', done: Boolean(manual.phone), manual: true },
   ];
 }
 async function openStartHere() {
@@ -205,7 +207,7 @@ const shellApi = {
 
 // ---------- assistant dock ----------
 const currentPath = () => ALIASES[(location.hash.replace(/^#/, '') || '/').split('?')[0]] ?? (location.hash.replace(/^#/, '') || '/').split('?')[0];
-const screenName = () => NAV.find((n) => n.path === currentPath())?.label ?? 'Keel';
+const screenName = () => NAV.find((n) => n.path === currentPath())?.label ?? 'Daybook';
 /** The dock shows beside every screen but the Assistant itself (which is the same conversation, full size). */
 function applyDock() {
   const wanted = store.get(DOCK_KEY, false);
@@ -236,7 +238,7 @@ async function navigate() {
   renderNav(path);
   $$('#accounts .k-acctnav').forEach((a) => a.classList.toggle('is-active', a.getAttribute('href') === `#/transactions?accounts=${encodeURIComponent(currentAccountFilter() ?? '')}`));
   closePopover();
-  document.title = path === '/' ? 'Keel' : `${nav.label} · Keel`;
+  document.title = path === '/' ? 'Daybook' : `${nav.label} · Daybook`;
   applyDock();
   // Switching conversations on the Assistant swaps the transcript in place; no need to rebuild the screen.
   if (path === '/' && current?.update && content.classList.contains('content--chat')) { current.update(params); return; }
@@ -318,6 +320,7 @@ addEventListener('resize', applyDock);
 // The assistant may have categorized, reviewed or budgeted: refresh the chrome and any stateless screen underneath.
 addEventListener('keel:assistant-done', () => { refreshChrome(); if (!['/', '/transactions'].includes(currentPath())) navigate(); });
 bindShell({ navigate, refreshChrome });
+bindConnections(() => { refreshChrome(); navigate(); });
 renderStatic();
 renderAccounts();
 renderStatus();

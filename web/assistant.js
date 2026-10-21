@@ -1,4 +1,4 @@
-// Assistant — docs/screens/assistant.md. The front door of Keel: the home screen (conversation rail + chat)
+// Assistant — docs/screens/assistant.md. The front door of Daybook: the home screen (conversation rail + chat)
 // and the dock that rides alongside every other screen (⌘J). Both are one `chatView` over /api/assistant,
 // the same tool registry Claude reaches over MCP, so what the assistant does here is what Claude does there.
 import { $, h, esc, ago, api, cached, invalidate, store, toast, isMac, I, titleBar, iconBtn, sheet, menu, emptyState } from './lib.js';
@@ -35,7 +35,7 @@ const toolSummary = (input) => {
     .map(([k, v]) => `${k}: ${Array.isArray(v) ? `${v.length} items` : typeof v === 'object' ? '…' : String(v).slice(0, 40)}`).join(' · ');
 };
 
-// ---------- markdown-lite (bold, code, em, links to Keel routes, lists, tables, headings) ----------
+// ---------- markdown-lite (bold, code, em, links to Daybook routes, lists, tables, headings) ----------
 export function md(text) {
   const lines = esc(text).split('\n');
   let out = '', inTable = false, list = null;
@@ -98,7 +98,7 @@ export function chatView({ compact = false, context = () => null, onConversation
         <button class="k-btn k-btn--primary chat__send" type="submit" aria-label="Send">${I.send}</button>
         <button class="k-btn chat__stop" type="button" aria-label="Stop" hidden>${I.stop}</button>
       </form>
-      <p class="chat__hint body-sm">Enter to send · Shift+Enter for a new line · Keel reads and edits through the same tools Claude gets over MCP.</p>
+      <p class="chat__hint body-sm">Enter to send · Shift+Enter for a new line · Daybook reads and edits through the same tools Claude gets over MCP.</p>
     </div></div>`);
   const log = $('.chat__log', el), input = $('.chat__input', el), form = $('.chat__composer', el), startersBox = $('.chat__starters', el), sendBtn = $('.chat__send', el), stopBtn = $('.chat__stop', el);
 
@@ -129,8 +129,8 @@ export function chatView({ compact = false, context = () => null, onConversation
   function welcome() {
     log.replaceChildren(h(`<div class="chat-welcome">
       <span class="k-empty__disc chat-welcome__disc">${I.chat}</span>
-      <h2 class="h1">${compact ? 'Ask Keel' : 'What do you want to know?'}</h2>
-      <p class="body chat-welcome__sub">Every account, transaction, budget and recurring charge is a question away. Keel can also review, categorize, split and budget for you.</p></div>`));
+      <h2 class="h1">${compact ? 'Ask Daybook' : 'What do you want to know?'}</h2>
+      <p class="body chat-welcome__sub">Every account, transaction, budget and recurring charge is a question away. Daybook can also review, categorize, split and budget for you.</p></div>`));
   }
 
   async function load(id) {
@@ -286,7 +286,7 @@ let dock = null;
 export function mountDock(host, { screenName }) {
   if (dock) return dock;
   const view = chatView({ compact: true, context: () => ({ screen: screenName(), route: location.hash || '#/' }) });
-  host.replaceChildren(h(`<header class="k-titlebar pane-bar dock__bar"><div class="k-titlebar__title"><span class="pane-title">Ask Keel</span><kbd>${mod}J</kbd></div>
+  host.replaceChildren(h(`<header class="k-titlebar pane-bar dock__bar"><div class="k-titlebar__title"><span class="pane-title">Ask Daybook</span><kbd>${mod}J</kbd></div>
     <div class="k-titlebar__actions"><button class="k-btn k-btn--icon" data-act="new-chat" aria-label="New chat" title="New chat">${I.plus}</button><a class="k-btn k-btn--icon" href="#/" aria-label="Open the Assistant" title="Open the Assistant">${I.expand}</a>${iconBtn(I.x, 'Close', 'data-act="dock"')}</div></header>`), view.el);
   host.addEventListener('click', (e) => { if (e.target.closest('[data-act="new-chat"]')) view.newChat(); });
   view.load();

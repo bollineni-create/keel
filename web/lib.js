@@ -1,4 +1,4 @@
-// Shared helpers for the Keel PWA: DOM, formatting, API, icons, popovers, sheets, toasts.
+// Shared helpers for the Daybook PWA: DOM, formatting, API, icons, popovers, sheets, toasts.
 
 // ---------- DOM ----------
 export const $ = (sel, el = document) => el.querySelector(sel);

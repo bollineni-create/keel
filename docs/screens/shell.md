@@ -12,7 +12,7 @@ independently; title bars are sticky.
    accounts, categories, recurrings (reuse `/api/transactions?q`, `/api/accounts`,
    `/api/categories`, `/api/recurring`).
 3. Primary nav — `Assistant` first (the home route, `⌘1`), then the 8 Copilot screens as
-   `NavItem`s (Lucide icons per README). The window-controls row also carries the `Ask Keel`
+   `NavItem`s (Lucide icons per README). The window-controls row also carries the `Ask Daybook`
    dock toggle (`⌘J`): the assistant rides as a third column beside any screen (see
    `assistant.md`).
 4. `MY ACCOUNTS` eyebrow → groups by `accounts.type` (Credit cards, Depository,

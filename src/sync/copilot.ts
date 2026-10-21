@@ -1,15 +1,16 @@
 /**
- * Pulls your Copilot Money data into Keel's SQLite via the community
+ * Pulls your Copilot Money data into Daybook's SQLite via the community
  * `copilot-money-mcp` server (reads the Copilot Mac app's local Firestore cache;
  * with --live-reads/--write it also talks to Copilot's GraphQL API).
  *
- * We speak MCP to it as a client over stdio, so Keel never touches Copilot's
+ * We speak MCP to it as a client over stdio, so Daybook never touches Copilot's
  * cache format or API directly — if their schema drifts, that project absorbs it.
  */
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { config } from '../config.js';
-import { getDb, nowIso, setMeta, upsert, type Row } from '../db.js';
+import { getDb, nowIso, upsert, type Row } from '../db.js';
+import { supersededCutoffs } from './enrich.js';
 
 type Json = Record<string, any>;
 
@@ -24,7 +25,7 @@ export class CopilotClient {
       const transport = new StdioClientTransport({
         command: config.copilotCommand,
         args: config.copilotArgs,
-        env: { ...process.env } as Record<string, string>,
+        env: childEnv(),
         stderr: 'pipe',
       });
       const client = new Client({ name: 'keel', version: '0.1.0' });
@@ -68,6 +69,12 @@ export class CopilotClient {
 
 export const copilot = new CopilotClient();
 
+/** The Copilot server is a third-party npx package: don't hand it Daybook's own secrets. */
+function childEnv(): Record<string, string> {
+  const secret = /^(ANTHROPIC_API_KEY|PLAID_|KEEL_TOKEN|KEEL_SECRET_KEY)/;
+  return Object.fromEntries(Object.entries(process.env).filter(([k, v]) => v !== undefined && !secret.test(k))) as Record<string, string>;
+}
+
 export interface SyncReport {
   startedAt: string;
   finishedAt: string;
@@ -87,12 +94,28 @@ export function syncFromCopilot(): Promise<SyncReport> {
 async function runSync(): Promise<SyncReport> {
   const report: SyncReport = { startedAt: nowIso(), finishedAt: '', counts: {}, warnings: [] };
   const live = config.copilotLiveEnabled;
+  // Accounts switched to a direct bank connection (enrich.ts supersedeAccount) take no new rows from Copilot.
+  const superseded = supersededCutoffs();
+  const keepTx = (r: Row) => {
+    const from = superseded.get(String(r.account_id));
+    return !from || String(r.date) < from;
+  };
+
+  if (config.copilotWriteEnabled) {
+    try {
+      const n = await replayPendingWrites();
+      if (n.done || n.failed) report.counts.replayed_writes = n.done;
+      if (n.failed) report.warnings.push(`queued writes: ${n.failed} still failing`);
+    } catch (e) {
+      report.warnings.push(`queued writes: ${(e as Error).message}`);
+    }
+  }
 
   // --- accounts
   try {
     const r = await copilot.call(live ? 'get_accounts_live' : 'get_accounts', { fields: ['all'] });
-    const rows = (r.accounts ?? []).map(mapAccount);
-    report.counts.accounts = upsert('accounts', rows);
+    const rows = (r.accounts ?? []).map(mapAccount).filter((a: Row) => !superseded.has(String(a.id)));
+    report.counts.accounts = upsert('accounts', rows, ['id'], { preserveEdited: true });
   } catch (e) {
     report.warnings.push(`accounts: ${(e as Error).message}`);
   }
@@ -120,7 +143,8 @@ async function runSync(): Promise<SyncReport> {
     for (let page = 0; page < 400; page++) {
       const r = await copilot.call(tool, { limit, offset, fields: ['all'], exclude_deleted: true, period: 'all_time' });
       const list: Json[] = r.transactions ?? [];
-      total += upsert('transactions', list.map(mapTransaction));
+      // preserveEdited: what the user changed in Daybook and hasn't pushed to Copilot survives the sync.
+      total += upsert('transactions', list.map(mapTransaction).filter(keepTx), ['id'], { preserveEdited: true });
       if (!r.has_more || list.length === 0) break;
       offset += list.length;
     }
@@ -163,7 +187,7 @@ async function runSync(): Promise<SyncReport> {
   // --- holdings
   try {
     const r = await copilot.call(live ? 'get_holdings_live' : 'get_holdings', { limit: 500 });
-    const rows = (r.holdings ?? []).map(mapHolding);
+    const rows = (r.holdings ?? []).map(mapHolding).filter((h: Row) => !superseded.has(String(h.account_id)));
     report.counts.holdings = upsert('holdings', rows);
   } catch (e) {
     report.warnings.push(`holdings: ${(e as Error).message}`);
@@ -206,8 +230,7 @@ async function runSync(): Promise<SyncReport> {
   }
 
   report.finishedAt = nowIso();
-  setMeta('last_sync', report.finishedAt);
-  setMeta('last_sync_report', JSON.stringify(report));
+  // last_sync / last_sync_report are written by syncAll (src/sync/index.ts), which runs this.
   return report;
 }
 
@@ -341,6 +364,29 @@ function dedupe(rows: Row[]): Row[] {
 }
 
 // ---------- write-through ----------
+
+/** Push edits queued while write mode was off (or that failed) now that it's on. Oldest first. */
+async function replayPendingWrites(): Promise<{ done: number; failed: number }> {
+  const d = getDb();
+  const rows = d.prepare(`SELECT id, tool, args FROM pending_writes WHERE status IN ('queued', 'failed') ORDER BY id LIMIT 500`).all() as Array<{ id: number; tool: string; args: string }>;
+  let done = 0, failed = 0;
+  for (const w of rows) {
+    try {
+      const args = JSON.parse(w.args);
+      await copilot.call(w.tool, args);
+      d.prepare(`UPDATE pending_writes SET status = 'done', error = NULL WHERE id = ?`).run(w.id);
+      // Copilot has these values now, so later edits made in Copilot can flow back into Daybook.
+      const clear = d.prepare(`UPDATE transactions SET local_edits = json_remove(local_edits, ?) WHERE id = ? AND local_edits IS NOT NULL`);
+      if (w.tool === 'update_transaction') for (const k of Object.keys(args).filter((k) => k !== 'transaction_id')) clear.run(`$.${k}`, args.transaction_id);
+      if (w.tool === 'review_transactions') for (const id of args.transaction_ids ?? []) clear.run('$.reviewed', id);
+      done++;
+    } catch (e) {
+      d.prepare(`UPDATE pending_writes SET status = 'failed', error = ? WHERE id = ?`).run((e as Error).message.slice(0, 500), w.id);
+      failed++;
+    }
+  }
+  return { done, failed };
+}
 
 /** Apply an edit to Copilot if write mode is on; otherwise queue it. */
 export async function pushWrite(tool: string, args: Json): Promise<{ pushed: boolean; result?: Json; error?: string }> {

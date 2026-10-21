@@ -57,8 +57,9 @@ Keep the Mac awake (`caffeinate -s npm start`, or a launchd agent — see below)
 
 ## Connect Claude (MCP)
 
-Keel exposes 16 tools (`get_overview`, `get_transactions`, `get_budgets`,
-`find_unusual_transactions`, `update_transaction`, `set_budget`, `sync_now`, …).
+Keel exposes 22 tools (`get_overview`, `get_transactions`, `get_budgets`,
+`find_unusual_transactions`, `update_transaction`, `bulk_update_transactions`,
+`split_transaction`, `set_budget`, `sync_now`, …).
 
 **Claude Code**
 ```bash
@@ -107,7 +108,11 @@ src/sync/copilot.ts MCP client → copilot-money-mcp → SQLite; write-through q
 src/sync/csv.ts    Copilot CSV importer
 src/assistant.ts   Anthropic tool loop, streamed
 src/mcp.ts         Keel as an MCP server
-web/               buildless PWA (index.html, app.js, styles.css, sw.js)
+web/app.js         buildless PWA shell: sidebar, panes, tab bar, ⌘K palette, router
+web/transactions.js the Transactions screen (windowed list, filters, bulk bar, detail pane)
+web/v1.js          v1 screens not yet migrated to the three-pane specs
+web/lib.js         shared helpers (format, API, icons, popover, sheet)
+design/            design-system mirror: tokens.json → web/tokens.css, components.css (served as /components.css)
 data/keel.db       your data (SQLite). Back this up; delete it to start over.
 ```
 
@@ -115,5 +120,9 @@ Amount convention (from Copilot): **positive = money out, negative = money in.**
 
 ## Design
 
-Screens follow the *Keel* design system (tokens in `web/styles.css`): dark-first,
-figures in IBM Plex Mono, green = positive, coral = spend, amber = attention.
+Screens follow the *Keel* design system (`design/`; see CLAUDE.md): light-first with a
+full dark theme, figures in IBM Plex Mono, green = income/up, red = over/down, amber =
+attention. Build order and per-screen specs are in `docs/screens/`.
+
+Keyboard: `⌘K` search · `⌘1…9` screens · in Transactions `↑/↓` move, `R` review, `E`
+category, `F` filter, `/` search, `⌘A` select all, `Esc` clear/close.

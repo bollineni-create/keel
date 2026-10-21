@@ -20,6 +20,11 @@ for (const theme of themes) {
 css += ':root {\n';
 for (const fam of ['spacing', 'radius']) for (const tok of t[fam]?.tokens ?? []) css += `  --${tok.name}: ${tok.value};\n`;
 for (const [k, v] of Object.entries(t.type.families)) css += `  --font-${k}: ${v};\n`;
+// Each type style as a `font` shorthand (+ tracking) so app CSS can say `font: var(--type-body)`.
+for (const g of t.type.groups) for (const s of g.styles) {
+  css += `  --type-${s.name}: ${s.fontWeight} ${s.fontSize}/${s.lineHeight} var(--font-${s.family ?? g.family});\n`;
+  css += `  --track-${s.name}: ${s.letterSpacing ?? 'normal'};\n`;
+}
 css += '}\n';
 for (const g of t.type.groups) for (const s of g.styles) {
   const fam = t.type.families[s.family ?? g.family];

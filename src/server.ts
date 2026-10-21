@@ -14,6 +14,7 @@ import { importCopilotCsv } from './sync/csv.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const webDir = path.resolve(__dirname, '../web');
+const designDir = path.resolve(__dirname, '../design');
 
 getDb();
 const app = express();
@@ -39,27 +40,45 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 const api = express.Router();
 api.get('/overview', (_req, res) => res.json(q.overview()));
 api.get('/summary', (req, res) => res.json(q.monthSummary(str(req.query.month) ?? q.monthKey())));
-api.get('/transactions', (req, res) => {
-  const f: q.TxFilter = {
-    month: str(req.query.month), start: str(req.query.start), end: str(req.query.end), query: str(req.query.q), category_id: str(req.query.category_id), account_id: str(req.query.account_id),
-    pending: bool(req.query.pending), unreviewed: bool(req.query.unreviewed), include_transfers: bool(req.query.transfers), include_excluded: bool(req.query.excluded),
-    limit: num(req.query.limit), offset: num(req.query.offset),
-  };
-  res.json(q.listTransactions(f));
+api.get('/transactions', (req, res) => res.json(q.listTransactions(txFilter(req))));
+api.get('/transactions/export.csv', (req, res) => {
+  const f = txFilter(req);
+  const cols = ['date', 'name', 'amount', 'category', 'account', 'type', 'status', 'tags', 'note'];
+  const cell = (v: unknown) => { const s = v == null ? '' : String(v); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+  const lines = [cols.join(',')];
+  for (let offset = 0; ; offset += 1000) {
+    const page = q.listTransactions({ ...f, limit: 1000, offset });
+    for (const t of page.transactions as any[]) {
+      const type = t.transfer ? 'transfer' : t.income ? 'income' : 'regular';
+      const status = [t.pending && 'pending', !t.reviewed && 'unreviewed', t.excluded && 'excluded', t.split && 'split'].filter(Boolean).join(' ');
+      lines.push([t.date, t.name, t.amount, t.category_name, t.account_name, type, status, q.parseTags(t.tags).join(' '), t.note].map(cell).join(','));
+    }
+    if (!page.has_more) break;
+  }
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="keel-transactions-${new Date().toISOString().slice(0, 10)}.csv"`);
+  res.send(lines.join('\n') + '\n');
 });
+api.post('/transactions', wrap(async (req, res) => res.json(await runTool('create_transaction', req.body))));
+api.post('/transactions/review', wrap(async (req, res) => res.json(await runTool('review_transactions', req.body))));
+api.post('/transactions/bulk', wrap(async (req, res) => res.json(await runTool('bulk_update_transactions', req.body))));
+api.post('/transactions/delete', wrap(async (req, res) => res.json(await runTool('delete_transactions', req.body))));
 api.get('/transactions/:id', (req, res) => {
   const t = q.getTransaction(req.params.id);
   t ? res.json(t) : res.status(404).json({ error: 'not found' });
 });
+api.get('/transactions/:id/similar', wrap(async (req, res) => res.json(await runTool('get_similar_transactions', { transaction_id: req.params.id, limit: num(req.query.limit) }))));
 api.patch('/transactions/:id', wrap(async (req, res) => res.json(await runTool('update_transaction', { transaction_id: req.params.id, ...req.body }))));
-api.post('/transactions/review', wrap(async (req, res) => res.json(await runTool('review_transactions', req.body))));
+api.post('/transactions/:id/split', wrap(async (req, res) => res.json(await runTool('split_transaction', { transaction_id: req.params.id, splits: req.body?.splits ?? [] }))));
+api.get('/tags', (_req, res) => res.json(q.listTags()));
+api.get('/goals', (_req, res) => res.json(q.listGoals()));
 api.get('/spending/categories', (req, res) => res.json(q.spendByCategory(str(req.query.month) ?? q.monthKey(), bool(req.query.parent_only) ?? true)));
 api.get('/spending/trend', (req, res) => res.json(q.spendByMonth(num(req.query.months) ?? 12)));
 api.get('/spending/daily', (req, res) => res.json(q.dailySpendCumulative(str(req.query.month) ?? q.monthKey())));
 api.get('/spending/unusual', (req, res) => res.json(q.unusualTransactions(str(req.query.month) ?? q.monthKey())));
 api.get('/budgets', (req, res) => res.json(q.budgetStatus(str(req.query.month) ?? q.monthKey())));
 api.put('/budgets/:categoryId', wrap(async (req, res) => res.json(await runTool('set_budget', { category_id: req.params.categoryId, amount: Number(req.body.amount) }))));
-api.get('/accounts', (req, res) => res.json({ accounts: q.listAccounts(bool(req.query.hidden) ?? false), net_worth: q.netWorth() }));
+api.get('/accounts', (req, res) => res.json({ accounts: q.listAccounts(bool(req.query.hidden) ?? false, bool(req.query.closed) ?? false), net_worth: q.netWorth() }));
 api.get('/networth/history', (req, res) => res.json(q.netWorthHistory(num(req.query.days) ?? 365)));
 api.get('/recurring', (req, res) => res.json(q.listRecurring(str(req.query.state))));
 api.get('/holdings', (_req, res) => res.json(q.listHoldings()));
@@ -117,6 +136,8 @@ app.all('/mcp', async (req, res) => {
 });
 
 // ---- static PWA ----
+// The design system's component classes are served from design/ so the app never forks them.
+app.get('/components.css', (_req, res) => res.sendFile(path.join(designDir, 'components.css')));
 app.use(express.static(webDir, { extensions: ['html'] }));
 app.get('*', (_req, res) => res.sendFile(path.join(webDir, 'index.html')));
 
@@ -136,6 +157,21 @@ app.listen(config.port, config.host, () => {
 });
 
 // ---- helpers ----
+/** Query → TxFilter. Multi-value params are comma-separated (`accounts=a,b`). */
+function txFilter(req: Request): q.TxFilter {
+  const qs = req.query;
+  return {
+    month: str(qs.month), start: str(qs.start), end: str(qs.end), query: str(qs.q), category_id: str(qs.category_id), account_id: str(qs.account_id),
+    pending: bool(qs.pending), unreviewed: bool(qs.unreviewed), include_transfers: bool(qs.transfers), include_excluded: bool(qs.excluded),
+    min_amount: num(qs.min), max_amount: num(qs.max),
+    account_ids: list(qs.accounts), category_ids: list(qs.categories), tags: list(qs.tags),
+    types: list(qs.types)?.filter((t): t is q.TxType => ['regular', 'income', 'transfer'].includes(t)),
+    statuses: list(qs.statuses)?.filter((t): t is q.TxStatus => ['pending', 'unreviewed', 'excluded'].includes(t)),
+    sort: (['date', 'amount', 'name'] as const).find((s) => s === qs.sort), dir: qs.dir === 'asc' ? 'asc' : qs.dir === 'desc' ? 'desc' : undefined,
+    limit: num(qs.limit), offset: num(qs.offset),
+  };
+}
+function list(v: unknown): string[] | undefined { const s = str(v); return s ? s.split(',').map((x) => x.trim()).filter(Boolean) : undefined; }
 function str(v: unknown): string | undefined { return typeof v === 'string' && v !== '' ? v : undefined; }
 function num(v: unknown): number | undefined { const n = Number(v); return typeof v === 'string' && v !== '' && Number.isFinite(n) ? n : undefined; }
 function bool(v: unknown): boolean | undefined { return v === 'true' || v === '1' ? true : v === 'false' || v === '0' ? false : undefined; }

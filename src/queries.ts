@@ -3,8 +3,9 @@
  */
 import { getDb, getMeta } from './db.js';
 
-export const SPEND_FILTER = `excluded = 0 AND transfer = 0 AND income = 0 AND amount > 0`;
-export const INCOME_FILTER = `excluded = 0 AND transfer = 0 AND (income = 1 OR amount < 0) AND amount < 0`;
+// A split parent's amount lives on in its children (split_parent_id), so totals skip the parent.
+export const SPEND_FILTER = `excluded = 0 AND transfer = 0 AND split = 0 AND income = 0 AND amount > 0`;
+export const INCOME_FILTER = `excluded = 0 AND transfer = 0 AND split = 0 AND (income = 1 OR amount < 0) AND amount < 0`;
 
 export function monthKey(d = new Date()): string {
   return d.toISOString().slice(0, 7);
@@ -29,8 +30,9 @@ export interface AccountRow {
   balance: number; available: number | null; limit_amt: number | null; currency: string; hidden: number; closed: number; updated_at: string;
 }
 
-export function listAccounts(includeHidden = false): AccountRow[] {
-  return getDb().prepare(`SELECT id,name,mask,type,subtype,institution,balance,available,limit_amt,currency,hidden,closed,updated_at FROM accounts WHERE closed = 0 ${includeHidden ? '' : 'AND hidden = 0'} ORDER BY type, name`).all() as AccountRow[];
+export function listAccounts(includeHidden = false, includeClosed = false): AccountRow[] {
+  const where = [includeClosed ? '' : 'closed = 0', includeHidden ? '' : 'hidden = 0'].filter(Boolean);
+  return getDb().prepare(`SELECT id,name,mask,type,subtype,institution,balance,available,limit_amt,currency,hidden,closed,updated_at FROM accounts ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY type, name`).all() as AccountRow[];
 }
 
 export const LIABILITY_TYPES = new Set(['credit', 'loan']);
@@ -78,13 +80,23 @@ export function netWorthHistory(days = 365): Array<{ date: string; net_worth: nu
 
 // ---------- transactions ----------
 
+export type TxType = 'regular' | 'income' | 'transfer';
+export type TxStatus = 'pending' | 'unreviewed' | 'excluded';
+export type TxSort = 'date' | 'amount' | 'name';
+
 export interface TxFilter {
   start?: string; end?: string; month?: string; query?: string; category_id?: string; account_id?: string;
   min_amount?: number; max_amount?: number; pending?: boolean; unreviewed?: boolean; include_transfers?: boolean; include_excluded?: boolean;
+  /** Multi-select filters: any of the listed values matches (OR within a filter, AND across filters). */
+  account_ids?: string[]; category_ids?: string[]; tags?: string[]; types?: TxType[]; statuses?: TxStatus[];
+  sort?: TxSort; dir?: 'asc' | 'desc';
   limit?: number; offset?: number;
 }
 
-export function listTransactions(f: TxFilter = {}) {
+/** Tags are stored as a JSON array of strings (Copilot's tag ids/names, or ones added in Keel). */
+const TAGS_OF = (col: string) => `json_each(CASE WHEN json_valid(${col}) THEN ${col} ELSE '[]' END)`;
+
+export function txWhere(f: TxFilter): { sql: string; args: unknown[] } {
   const where: string[] = [];
   const args: unknown[] = [];
   if (f.month) {
@@ -95,26 +107,81 @@ export function listTransactions(f: TxFilter = {}) {
   if (f.end) { where.push('t.date <= ?'); args.push(f.end); }
   if (f.query) { where.push('(t.name LIKE ? OR t.original_name LIKE ? OR t.note LIKE ?)'); const q = `%${f.query}%`; args.push(q, q, q); }
   if (f.category_id) { where.push('(t.category_id = ? OR c.parent_id = ?)'); args.push(f.category_id, f.category_id); }
+  if (f.category_ids?.length) {
+    const ph = f.category_ids.map(() => '?').join(',');
+    where.push(`(t.category_id IN (${ph}) OR c.parent_id IN (${ph}))`); args.push(...f.category_ids, ...f.category_ids);
+  }
   if (f.account_id) { where.push('t.account_id = ?'); args.push(f.account_id); }
+  if (f.account_ids?.length) { where.push(`t.account_id IN (${f.account_ids.map(() => '?').join(',')})`); args.push(...f.account_ids); }
+  if (f.tags?.length) { where.push(`EXISTS (SELECT 1 FROM ${TAGS_OF('t.tags')} WHERE value IN (${f.tags.map(() => '?').join(',')}))`); args.push(...f.tags); }
   if (f.min_amount != null) { where.push('ABS(t.amount) >= ?'); args.push(f.min_amount); }
   if (f.max_amount != null) { where.push('ABS(t.amount) <= ?'); args.push(f.max_amount); }
   if (f.pending != null) { where.push('t.pending = ?'); args.push(f.pending ? 1 : 0); }
   if (f.unreviewed) where.push('t.reviewed = 0');
-  if (!f.include_transfers) where.push('t.transfer = 0');
-  if (!f.include_excluded) where.push('t.excluded = 0');
-  const w = where.length ? `WHERE ${where.join(' AND ')}` : '';
+  if (f.types?.length) {
+    const any = f.types.map((ty) => (ty === 'transfer' ? 't.transfer = 1' : ty === 'income' ? '(t.transfer = 0 AND t.income = 1)' : '(t.transfer = 0 AND t.income = 0)'));
+    where.push(`(${any.join(' OR ')})`);
+  }
+  if (f.statuses?.length) {
+    const any = f.statuses.map((st) => (st === 'pending' ? 't.pending = 1' : st === 'unreviewed' ? 't.reviewed = 0' : 't.excluded = 1'));
+    where.push(`(${any.join(' OR ')})`);
+  }
+  if (!f.include_transfers && !f.types?.includes('transfer')) where.push('t.transfer = 0');
+  if (!f.include_excluded && !f.statuses?.includes('excluded')) where.push('t.excluded = 0');
+  return { sql: where.length ? `WHERE ${where.join(' AND ')}` : '', args };
+}
+
+const TX_COLUMNS = `t.id, t.date, t.name, t.amount, t.account_id, a.name account_name, a.mask account_mask, t.category_id, c.name category_name, c.emoji category_emoji, c.parent_id category_parent_id, t.pending, t.reviewed, t.excluded, t.transfer, t.income, t.note, t.recurring_id, t.tags, t.split, t.split_parent_id, t.goal_id`;
+const TX_FROM = `FROM transactions t LEFT JOIN categories c ON c.id = t.category_id LEFT JOIN accounts a ON a.id = t.account_id`;
+
+function txOrder(f: TxFilter): string {
+  const dir = f.dir === 'asc' ? 'ASC' : 'DESC';
+  if (f.sort === 'amount') return `t.amount ${dir}, t.date DESC, t.id DESC`;
+  if (f.sort === 'name') return `t.name COLLATE NOCASE ${f.dir === 'desc' ? 'DESC' : 'ASC'}, t.date DESC, t.id DESC`;
+  // date: keep a split parent's children directly under it
+  return `t.date ${dir}, COALESCE(t.split_parent_id, t.id) ${dir}, t.split_parent_id IS NOT NULL, t.id`;
+}
+
+export function listTransactions(f: TxFilter = {}) {
+  const { sql: w, args } = txWhere(f);
   const limit = Math.min(Math.max(f.limit ?? 100, 1), 1000);
   const offset = Math.max(f.offset ?? 0, 0);
   const d = getDb();
   const total = (d.prepare(`SELECT COUNT(*) n FROM transactions t LEFT JOIN categories c ON c.id = t.category_id ${w}`).get(...args) as { n: number }).n;
-  const rows = d.prepare(`SELECT t.id, t.date, t.name, t.amount, t.account_id, a.name account_name, a.mask account_mask, t.category_id, c.name category_name, c.emoji category_emoji, c.parent_id category_parent_id, t.pending, t.reviewed, t.excluded, t.transfer, t.income, t.note, t.recurring_id, t.tags
-    FROM transactions t LEFT JOIN categories c ON c.id = t.category_id LEFT JOIN accounts a ON a.id = t.account_id ${w}
-    ORDER BY t.date DESC, t.id DESC LIMIT ? OFFSET ?`).all(...args, limit, offset);
+  const rows = d.prepare(`SELECT ${TX_COLUMNS} ${TX_FROM} ${w} ORDER BY ${txOrder(f)} LIMIT ? OFFSET ?`).all(...args, limit, offset);
   return { total, count: rows.length, offset, has_more: offset + rows.length < total, transactions: rows };
 }
 
 export function getTransaction(id: string) {
-  return getDb().prepare(`SELECT t.*, c.name category_name, a.name account_name FROM transactions t LEFT JOIN categories c ON c.id = t.category_id LEFT JOIN accounts a ON a.id = t.account_id WHERE t.id = ?`).get(id) as any;
+  return getDb().prepare(`SELECT t.*, c.name category_name, c.emoji category_emoji, c.parent_id category_parent_id, a.name account_name, a.mask account_mask, g.name goal_name
+    ${TX_FROM} LEFT JOIN goals g ON g.id = t.goal_id WHERE t.id = ?`).get(id) as any;
+}
+
+/** Same merchant, newest first, grouped by month with this account's total and the all-accounts total. */
+export function similarTransactions(id: string, limit = 60) {
+  const t = getTransaction(id);
+  if (!t) return null;
+  const rows = getDb().prepare(`SELECT ${TX_COLUMNS} ${TX_FROM} WHERE t.name = ? COLLATE NOCASE AND t.id != ? AND t.split = 0 ORDER BY t.date DESC, t.id DESC LIMIT ?`).all(t.name, id, limit) as any[];
+  const months = new Map<string, { month: string; account_total: number; all_total: number; transactions: any[] }>();
+  for (const r of rows) {
+    const m = r.date.slice(0, 7);
+    if (!months.has(m)) months.set(m, { month: m, account_total: 0, all_total: 0, transactions: [] });
+    const g = months.get(m)!;
+    g.transactions.push(r);
+    g.all_total += r.amount;
+    if (r.account_id === t.account_id) g.account_total += r.amount;
+  }
+  return { transaction_id: id, name: t.name, account_id: t.account_id, months: [...months.values()].map((g) => ({ ...g, account_total: round(g.account_total), all_total: round(g.all_total) })) };
+}
+
+export function parseTags(v: unknown): string[] {
+  if (Array.isArray(v)) return v.map(String);
+  if (typeof v !== 'string' || !v) return [];
+  try { const j = JSON.parse(v); return Array.isArray(j) ? j.map(String) : []; } catch { return v.split(',').map((s) => s.trim()).filter(Boolean); }
+}
+
+export function listTags(): Array<{ tag: string; n: number }> {
+  return getDb().prepare(`SELECT value tag, COUNT(*) n FROM transactions t, ${TAGS_OF('t.tags')} GROUP BY value ORDER BY value COLLATE NOCASE`).all() as any[];
 }
 
 // ---------- spending ----------
@@ -246,6 +313,12 @@ export function listHoldings() {
   const rows = d.prepare(`SELECT h.id, h.account_id, a.name account_name, h.ticker, h.name, h.quantity, h.price, h.value, h.cost_basis FROM holdings h LEFT JOIN accounts a ON a.id = h.account_id ORDER BY h.value DESC`).all() as any[];
   const total = rows.reduce((s, r) => s + (r.value ?? 0), 0);
   return { total: round(total), holdings: rows.map((r) => ({ ...r, weight: total ? Math.round(((r.value ?? 0) / total) * 1000) / 10 : 0, gain: r.cost_basis != null && r.value != null ? round(r.value - r.cost_basis) : null })) };
+}
+
+// ---------- goals ----------
+
+export function listGoals() {
+  return getDb().prepare(`SELECT id, name, target, current, due FROM goals ORDER BY name`).all() as any[];
 }
 
 // ---------- categories ----------

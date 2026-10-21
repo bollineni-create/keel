@@ -45,6 +45,36 @@ Both need a browser (Chrome/Safari/Firefox) logged in to app.copilot.money; the
 server reuses that session. Without `--write`, edits you make in Keel apply locally and
 are queued (Settings shows the count).
 
+## The Mac app
+
+`app/macos` wraps Keel in a native window with its own menus and Dock icon, like
+Palimpsest's and Gridline's Mac apps. It starts Keel's server from this folder when you
+open it (or uses one that's already running) and stops it when you quit.
+
+**Install on a Mac (simplest).** Paste this into Terminal. It downloads Keel to `~/keel`,
+installs its packages, builds the app, puts it in Applications and opens it (it offers to
+install Apple's command-line tools and Node first if you don't have them):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/bollineni-create/keel/main/app/macos/install.sh | zsh
+```
+
+Running the same line again updates and reinstalls; your data (`data/`) and settings
+(`.env`) are never touched. From a checkout you already have, `npm run app` does the build
+and install (`./app/macos/build.sh --no-install` builds only).
+
+After that, open Keel from Launchpad, Spotlight or the Dock. The red close button hides
+the window instead of quitting, so the server keeps serving your phone and the MCP
+endpoint; click the Dock icon to bring it back, and quit with ⌘Q (which stops the server
+the app started). Edits under `web/` reload the window and edits under `src/` restart the
+server. If the folder moves, rebuild. The build is ad-hoc signed, so on another Mac
+right-click → **Open** the first time. The server log is at
+`~/Library/Logs/Keel/server.log` (Server → Show Server Log). Every PR that touches
+`app/macos` is compiled on a Mac runner (`.github/workflows/mac-app.yml`).
+
+To keep the server up even after quitting, run it with launchd (below); the app then
+just connects to it.
+
 ## Phone
 
 1. Set `HOST=0.0.0.0` (default) and a `KEEL_TOKEN` in `.env`.
@@ -112,6 +142,7 @@ web/app.js         buildless PWA shell: sidebar, panes, tab bar, ⌘K palette, r
 web/transactions.js the Transactions screen (windowed list, filters, bulk bar, detail pane)
 web/v1.js          v1 screens not yet migrated to the three-pane specs
 web/lib.js         shared helpers (format, API, icons, popover, sheet)
+app/macos/         native Mac app (Swift, WKWebView) that runs the server: npm run app
 design/            design-system mirror: tokens.json → web/tokens.css, components.css (served as /components.css)
 data/keel.db       your data (SQLite). Back this up; delete it to start over.
 ```

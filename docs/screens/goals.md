@@ -14,7 +14,7 @@ Wireframe: `../visuals/goals.svg`. Source audit: feature map §3.
 (savings), colour.
 
 **Data.** `/api/goals` (new CRUD over the `goals` table; Copilot goals are cache-only and
-read-only — Keel-native goals are editable).
+read-only — Daybook-native goals are editable).
 
 **Acceptance.** Saved this month = sum of transactions flagged to the goal (Transactions
 detail → `Goal +`) plus linked-account balance growth, whichever the goal is configured for.

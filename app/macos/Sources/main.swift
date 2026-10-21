@@ -1,8 +1,8 @@
 import AppKit
 import WebKit
 
-// Keel: a native window around the Keel PWA, in the same mould as Palimpsest's and Gridline's Mac apps.
-// The app runs Keel's Node server from the project folder named in Info.plist (KeelSourceFolder), or uses one
+// Daybook: a native window around the Daybook PWA, in the same mould as Palimpsest's and Gridline's Mac apps.
+// The app runs Daybook's Node server from the project folder named in Info.plist (KeelSourceFolder), or uses one
 // that's already running (a launchd agent, `npm start`), and shows it in a WKWebView. Closing the window hides
 // it, so the server keeps serving your phone and Claude; Quit stops the server only if the app started it.
 // Files under web/ reload the window when they change; files under src/ restart the server the app owns.
@@ -52,7 +52,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
         window = NSWindow(contentRect: NSRect(origin: .zero, size: size),
                           styleMask: [.titled, .closable, .miniaturizable, .resizable],
                           backing: .buffered, defer: false)
-        window.title = "Keel"
+        window.title = "Daybook"
         window.minSize = NSSize(width: 380, height: 520)
         window.collectionBehavior.insert(.fullScreenPrimary)
         window.backgroundColor = .windowBackgroundColor
@@ -69,7 +69,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
         connect()
         Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in self?.checkForChanges() }
 
-        // `pkill Keel` (or a logout) quits through applicationShouldTerminate, so the server never outlives the app.
+        // `pkill Daybook` (or a logout) quits through applicationShouldTerminate, so the server never outlives the app.
         signal(SIGTERM, SIG_IGN)
         sigterm = DispatchSource.makeSignalSource(signal: SIGTERM, queue: .main)
         sigterm?.setEventHandler { NSApp.terminate(nil) }
@@ -99,19 +99,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
 
     // MARK: Server
 
-    /// Uses a Keel server that's already answering on the port, otherwise starts one.
+    /// Uses a Daybook server that's already answering on the port, otherwise starts one.
     func connect() {
         env = readEnv()
         ready = false
         guard root != nil else {
-            return showMessage("Keel can’t find its project folder",
-                               "This app runs Keel from the folder it was built in, and that folder has moved. Rebuild it with <code>npm run app</code> from the new location.")
+            return showMessage("Daybook can’t find its project folder",
+                               "This app runs Daybook from the folder it was built in, and that folder has moved. Rebuild it with <code>npm run app</code> from the new location.")
         }
-        showMessage("Starting Keel…", nil, spinner: true)
+        showMessage("Starting Daybook…", nil, spinner: true)
         probe { code in
             switch code {
             case 200: self.openApp()
-            case 401: self.showMessage("Keel turned the app away",
+            case 401: self.showMessage("Daybook turned the app away",
                                        "Something on port \(self.port) is asking for a token that doesn’t match <code>KEEL_TOKEN</code> in <code>.env</code>.",
                                        actions: [("Try again", "retry")])
             default: self.startServer()
@@ -131,7 +131,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
     func startServer() {
         guard let root = root else { return }
         guard FileManager.default.fileExists(atPath: root.appendingPathComponent("node_modules/tsx").path) else {
-            return showMessage("Keel’s packages aren’t installed",
+            return showMessage("Daybook’s packages aren’t installed",
                                "Run <code>npm install</code> in <code>\(esc(root.path))</code>, then try again.",
                                actions: [("Try again", "retry"), ("Show project folder", "folder")])
         }
@@ -140,7 +140,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
         let log = try? FileHandle(forWritingTo: logURL)
 
         // A login shell finds Node wherever it was installed (Homebrew, nvm, fnm, Volta). `exec` makes the
-        // server this process itself, so terminating it stops Keel cleanly.
+        // server this process itself, so terminating it stops Daybook cleanly.
         let script = """
         export PATH="/opt/homebrew/bin:/usr/local/bin:$HOME/.volta/bin:$PATH"
         [ -s "$HOME/.nvm/nvm.sh" ] && . "$HOME/.nvm/nvm.sh" >/dev/null 2>&1
@@ -158,7 +158,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
             DispatchQueue.main.async { self?.serverExited(proc.terminationStatus) }
         }
         do { try p.run() } catch {
-            return showMessage("Keel’s server couldn’t start", esc(error.localizedDescription), actions: [("Try again", "retry")])
+            return showMessage("Daybook’s server couldn’t start", esc(error.localizedDescription), actions: [("Try again", "retry")])
         }
         server = p
         startedAt = Date()
@@ -170,7 +170,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
             guard let p = self.server, p.isRunning else { return }
             if code == 200 { return self.openApp() }
             if Date().timeIntervalSince(self.startedAt) > 60 {
-                return self.showMessage("Keel’s server didn’t answer", self.logTail(), actions: [("Try again", "retry"), ("Show log", "log")])
+                return self.showMessage("Daybook’s server didn’t answer", self.logTail(), actions: [("Try again", "retry"), ("Show log", "log")])
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { self.waitForServer() }
         }
@@ -182,9 +182,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
         if restarting { restarting = false; return connect() }
         ready = false
         if status == 127 {
-            showMessage("Keel needs Node.js", "Install Node.js 20 or later (<code>brew install node</code>), then try again.", actions: [("Try again", "retry")])
+            showMessage("Daybook needs Node.js", "Install Node.js 20 or later (<code>brew install node</code>), then try again.", actions: [("Try again", "retry")])
         } else {
-            showMessage("Keel’s server stopped", logTail(), actions: [("Restart", "retry"), ("Show log", "log")])
+            showMessage("Daybook’s server stopped", logTail(), actions: [("Restart", "retry"), ("Show log", "log")])
         }
     }
 
@@ -200,7 +200,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
         guard server != nil else { return connect() }
         restarting = true
         ready = false
-        showMessage("Restarting Keel…", nil, spinner: true)
+        showMessage("Restarting Daybook…", nil, spinner: true)
         server?.terminate()
     }
 
@@ -253,7 +253,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
     // MARK: Status pages
 
     func showMessage(_ title: String, _ body: String?, spinner: Bool = false, actions: [(String, String)] = []) {
-        if !spinner { window.title = "Keel" }
+        if !spinner { window.title = "Daybook" }
         let buttons = actions.map { "<a class=\"btn\" href=\"keel://\($0.1)\">\(esc($0.0))</a>" }.joined()
         let spin = spinner ? "<div class=\"spin\"></div>" : ""
         var text = ""
@@ -308,7 +308,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
             handleCommand(url.host ?? "")
             return decisionHandler(.cancel)
         }
-        // Frames inside Keel's page (Plaid Link's iframe) load where they like; only the page itself is kept to Keel.
+        // Frames inside Daybook's page (Plaid Link's iframe) load where they like; only the page itself is kept to Daybook.
         if action.targetFrame?.isMainFrame == false { return decisionHandler(.allow) }
         let isKeel = (url.host == "127.0.0.1" || url.host == "localhost") && url.port == port
         if url.scheme?.hasPrefix("http") == true && !isKeel {
@@ -472,14 +472,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
 
         let appItem = NSMenuItem(); main.addItem(appItem)
         let appMenu = NSMenu()
-        appMenu.addItem(withTitle: "About Keel", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
+        appMenu.addItem(withTitle: "About Daybook", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
         appMenu.addItem(.separator())
         appMenu.addItem(item("Settings…", #selector(openSettings(_:)), ","))
         appMenu.addItem(.separator())
-        appMenu.addItem(withTitle: "Hide Keel", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
+        appMenu.addItem(withTitle: "Hide Daybook", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
         appMenu.addItem(item("Hide Others", #selector(NSApplication.hideOtherApplications(_:)), "h", [.command, .option]))
         appMenu.addItem(.separator())
-        appMenu.addItem(withTitle: "Quit Keel", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        appMenu.addItem(withTitle: "Quit Daybook", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         appItem.submenu = appMenu
 
         let fileItem = NSMenuItem(); main.addItem(fileItem)
@@ -541,7 +541,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
         let helpItem = NSMenuItem(); main.addItem(helpItem)
         let help = NSMenu(title: "Help")
         help.addItem(withTitle: "Start Here", action: #selector(openStartHere(_:)), keyEquivalent: "")
-        help.addItem(withTitle: "Keel on GitHub", action: #selector(openHelp(_:)), keyEquivalent: "")
+        help.addItem(withTitle: "Daybook on GitHub", action: #selector(openHelp(_:)), keyEquivalent: "")
         helpItem.submenu = help
         NSApp.helpMenu = help
 

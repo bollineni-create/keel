@@ -102,7 +102,7 @@ export interface TxFilter {
   limit?: number; offset?: number;
 }
 
-/** Tags are stored as a JSON array of strings (Copilot's tag ids/names, or ones added in Keel). */
+/** Tags are stored as a JSON array of strings (Copilot's tag ids/names, or ones added in Daybook). */
 const TAGS_OF = (col: string) => `json_each(CASE WHEN json_valid(${col}) THEN ${col} ELSE '[]' END)`;
 
 export function txWhere(f: TxFilter): { sql: string; args: unknown[] } {

@@ -1,4 +1,4 @@
-// Keel PWA — buildless ES modules. This file is the shell (docs/screens/shell.md): sidebar, panes,
+// Daybook PWA — buildless ES modules. This file is the shell (docs/screens/shell.md): sidebar, panes,
 // title bars, phone tab bar + More sheet, ⌘K palette, keyboard, and the hash router.
 import { $, $$, h, esc, moneyShort, txAmount, ago, api, cached, invalidate, store, toast, isTyping, isMac, hue, catTag, I, titleBar, iconBtn, sheet, closeTopSheet, closePopover } from './lib.js';
 import { screens as v1, bindShell } from './v1.js';
@@ -103,7 +103,7 @@ async function onboarding() {
     { id: 'review', label: 'Review your transactions', hint: summary.unreviewed ? `${summary.unreviewed} waiting.` : 'All caught up.', done: !summary.unreviewed, action: ['Review', () => (location.hash = '#/transactions?statuses=unreviewed')] },
     { id: 'budget', label: 'Set a budget', hint: 'Give at least one category a monthly budget.', done: s.counts.budgets > 0, action: ['Categories', () => (location.hash = '#/categories')] },
     { id: 'mcp', label: 'Connect Claude over MCP', hint: 'Claude Desktop, Claude Code or claude.ai can read and edit your finances.', done: Boolean(manual.mcp), manual: true, action: ['Show me how', openSettings] },
-    { id: 'phone', label: 'Add Keel to your phone', hint: 'Open Keel in Safari on your phone, then Share → Add to Home Screen.', done: Boolean(manual.phone), manual: true },
+    { id: 'phone', label: 'Add Daybook to your phone', hint: 'Open Daybook in Safari on your phone, then Share → Add to Home Screen.', done: Boolean(manual.phone), manual: true },
   ];
 }
 async function openStartHere() {
@@ -217,7 +217,7 @@ async function navigate() {
   current?.destroy?.();
   current = null;
   closePopover();
-  document.title = `${nav.label} · Keel`;
+  document.title = `${nav.label} · Daybook`;
   try {
     if (path === '/transactions') {
       content.className = 'content content--split';

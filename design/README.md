@@ -1,6 +1,6 @@
-# Keel
+# Daybook
 
-Keel is the design system for Naren's self-hosted money app — a functional twin of
+Daybook is the design system for Naren's self-hosted money app — a functional twin of
 Copilot Money's Mac app (same screens, panes, rows, charts and workflows; see the repo's
 `docs/copilot-feature-map.md`) with its own name, palette and icon set. One person uses it
 on a Mac and a phone, with a Claude assistant and an MCP endpoint built in. This system
@@ -83,6 +83,12 @@ Investments `trending-up` · Categories `tags` · Recurrings `repeat` · Setting
 · Start here `rocket` · Get help `circle-help`. Institution avatars are 24px discs showing
 the institution logo when the data has one, else the first letter on `bg-300`. Category
 emoji come from the data and are never replaced.
+
+**App icon.** An open daybook with two short entries on its right page: the ledger, kept
+daily. Drawn in rounded 4.5/64 strokes; `brand-ink` on `brand` (dark `#3ccf9a`) inside a
+`#0d1014` rounded square for the PWA, white on light `brand` for the Mac app. The master is
+`web/icon.svg` in the repo; `app/macos/make_icon.swift` redraws the same mark for macOS.
+(The app was called Keel until October 2026.)
 
 ## Components
 

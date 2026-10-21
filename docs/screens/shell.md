@@ -11,7 +11,7 @@ independently; title bars are sticky.
 2. Search — `Button`/`Input` search variant, `⌘K` → command palette over transactions,
    accounts, categories, recurrings (reuse `/api/transactions?q`, `/api/accounts`,
    `/api/categories`, `/api/recurring`).
-3. Primary nav — 8 × `NavItem` (Lucide icons per README) + `Assistant` as a 9th item in Keel.
+3. Primary nav — 8 × `NavItem` (Lucide icons per README) + `Assistant` as a 9th item in Daybook.
 4. `MY ACCOUNTS` eyebrow → groups by `accounts.type` (Credit cards, Depository,
    Investments, Loans, Other), each a collapsible header + `AccountNavRow`s.
    Balance abbreviates: `$5,278`, `$47.9k` over 10k. Hidden/closed rows faint, at the end.

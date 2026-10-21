@@ -1,5 +1,5 @@
 #!/bin/zsh
-# Downloads (or updates) Keel into ~/keel, builds the Mac app, installs it into /Applications and opens it.
+# Downloads (or updates) Daybook into ~/keel, builds the Mac app, installs it into /Applications and opens it.
 #
 #   curl -fsSL https://raw.githubusercontent.com/bollineni-create/keel/main/app/macos/install.sh | zsh
 #
@@ -17,7 +17,7 @@ if ! command -v node >/dev/null 2>&1; then
   if command -v brew >/dev/null 2>&1; then
     brew install node
   else
-    echo "Keel needs Node.js 20 or later. Install it from https://nodejs.org (or Homebrew), then run this command again."
+    echo "Daybook needs Node.js 20 or later. Install it from https://nodejs.org (or Homebrew), then run this command again."
     exit 1
   fi
 fi

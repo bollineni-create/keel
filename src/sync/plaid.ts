@@ -1,12 +1,12 @@
 /**
- * Plaid: the aggregator Copilot itself mostly uses. Keel talks to Plaid's REST API directly (no SDK).
+ * Plaid: the aggregator Copilot itself mostly uses. Daybook talks to Plaid's REST API directly (no SDK).
  *
  *  Link (in the browser) → public_token → /item/public_token/exchange → access_token, stored encrypted.
  *  Each sync: /accounts/get (cached balances, free) → /transactions/sync from the saved cursor
  *  → /investments/holdings/get when the Item has investment accounts.
  *
- * Plaid's amount convention is Keel's (positive = money out), so amounts are stored as they come.
- * Without a public URL there are no webhooks; Keel polls, and broken logins surface as
+ * Plaid's amount convention is Daybook's (positive = money out), so amounts are stored as they come.
+ * Without a public URL there are no webhooks; Daybook polls, and broken logins surface as
  * ITEM_LOGIN_REQUIRED from these calls (status needs_reauth → Link in update mode).
  */
 import { config } from '../config.js';
@@ -38,7 +38,7 @@ function baseUrl(): string {
 }
 
 export async function plaidPost(path: string, body: Json): Promise<Json> {
-  if (!config.plaid.configured) throw new ConnectionError('Plaid is not set up: add PLAID_CLIENT_ID and PLAID_SECRET to .env and restart Keel.');
+  if (!config.plaid.configured) throw new ConnectionError('Plaid is not set up: add PLAID_CLIENT_ID and PLAID_SECRET to .env and restart Daybook.');
   const res = await fetchImpl(baseUrl() + path, {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'PLAID-CLIENT-ID': config.plaid.clientId, 'PLAID-SECRET': config.plaid.secret, 'Plaid-Version': '2020-09-14' },
@@ -69,7 +69,7 @@ function asConnectionError(e: unknown): unknown {
 /** A link_token for Plaid Link. With a connection id, Link opens in update mode to repair that login. */
 export async function createLinkToken(connectionId?: string): Promise<{ link_token: string; expiration: string; mode: 'new' | 'update' }> {
   const body: Json = {
-    client_name: 'Keel',
+    client_name: 'Daybook',
     language: 'en',
     country_codes: ['US', 'CA'],
     user: { client_user_id: 'keel-owner' },
@@ -126,7 +126,7 @@ export function mapPlaidAccount(a: Json, conn: ConnectionRow): Row {
     type,
     subtype: a.subtype ?? null,
     institution: conn.institution,
-    // Plaid reports credit and loan balances as the positive amount owed, which is how Keel stores them.
+    // Plaid reports credit and loan balances as the positive amount owed, which is how Daybook stores them.
     balance: Number.isFinite(current) ? current : 0,
     available: b.available ?? null,
     limit_amt: b.limit ?? null,
@@ -164,7 +164,7 @@ export function mapPlaidTransaction(t: Json, conn: ConnectionRow): Row {
   };
 }
 
-/** Columns a re-sync must not overwrite: Keel's (or the user's) judgement, not the bank's. */
+/** Columns a re-sync must not overwrite: Daybook's (or the user's) judgement, not the bank's. */
 const TX_INSERT_ONLY = ['category_id', 'transfer', 'income'];
 /** Carried from a pending row to the posted row that replaces it. */
 const CARRY = ['category_id', 'reviewed', 'excluded', 'note', 'tags', 'goal_id', 'transfer', 'income', 'local_edits'];

@@ -1,5 +1,5 @@
 /**
- * SQLite storage for Keel.
+ * SQLite storage for Daybook.
  *
  * Amount convention follows Copilot Money: positive = money OUT (spend),
  * negative = money IN (income, refunds). Every query in queries.ts assumes this.
@@ -114,7 +114,7 @@ const ADDED_COLUMNS: Array<[table: string, column: string, decl: string]> = [
   ['transactions', 'split', 'INTEGER DEFAULT 0'],
   ['transactions', 'split_parent_id', 'TEXT'],
   ['transactions', 'goal_id', 'TEXT'],
-  // {column: 1} for every column edited in Keel and not pushed upstream; sync leaves those columns alone.
+  // {column: 1} for every column edited in Daybook and not pushed upstream; sync leaves those columns alone.
   ['transactions', 'local_edits', 'TEXT'],
   ['transactions', 'connection_id', 'TEXT'],
   ['transactions', 'provider_category', 'TEXT'],
@@ -141,7 +141,7 @@ function migrate(d: Database.Database): void {
 /** The database holds bank-access tokens once connections exist: keep it readable by this user only. */
 function lockDown(): void {
   try {
-    // Only Keel's own data/ folder; a KEEL_DB pointing into ~ or a shared folder leaves that folder alone.
+    // Only Daybook's own data/ folder; a KEEL_DB pointing into ~ or a shared folder leaves that folder alone.
     if (path.dirname(config.dbPath) === path.resolve('data')) fs.chmodSync(path.dirname(config.dbPath), 0o700);
     for (const f of [config.dbPath, `${config.dbPath}-wal`, `${config.dbPath}-shm`]) if (fs.existsSync(f)) fs.chmodSync(f, 0o600);
   } catch {
@@ -158,7 +158,7 @@ export function setMeta(key: string, value: string): void {
 }
 
 export interface UpsertOptions {
-  /** Keep any column the user edited in Keel (listed in the row's local_edits JSON). */
+  /** Keep any column the user edited in Daybook (listed in the row's local_edits JSON). */
   preserveEdited?: boolean;
   /** Written when the row is new, never on conflict (e.g. a provider's first guess at a category). */
   insertOnly?: string[];
@@ -188,7 +188,7 @@ function toSql(v: unknown): unknown {
   return v;
 }
 
-/** Record that the user edited these columns in Keel, so the next sync keeps them. */
+/** Record that the user edited these columns in Daybook, so the next sync keeps them. */
 export function markEdited(table: 'transactions' | 'accounts', id: string, columns: string[]): void {
   if (!columns.length) return;
   const patch = JSON.stringify(Object.fromEntries(columns.map((c) => [c, 1])));

@@ -1,4 +1,4 @@
-// Keel v1 screens (single-pane card grid). They render inside the shell's main pane and get
+// Daybook v1 screens (single-pane card grid). They render inside the shell's main pane and get
 // migrated to the three-pane specs in docs/screens/ one at a time; Transactions lives in transactions.js.
 import { $, h, esc, money, pct, today, thisMonth, monthLabel, monthShort, shiftMonth, dateLabel, api, toast, store, I, sheet, emptyState } from './lib.js';
 import { connectionsCard, openAddAccount } from './connections.js';
@@ -212,10 +212,10 @@ export const screens = {
           <dl class="kv"><dt>Model</dt><dd>${esc(s.assistant.model)}</dd><dt>Tools</dt><dd>${s.mcp.tools.length}</dd></dl>
           <p class="body-sm muted" style="margin-top:12px">Set <code>ANTHROPIC_API_KEY</code> in <code>.env</code> and restart to enable the in-app assistant.</p>
           <div class="toggle" style="margin-top:12px"><span>Light theme</span><button class="switch ${theme === 'light' ? 'on' : ''}" id="theme" aria-label="Toggle theme"></button></div></div>
-        <div class="card col-12"><div class="card-head"><h2 class="h2">Connect Claude to Keel (MCP)</h2></div>
-          <p class="body-sm muted">Keel serves the same ${s.mcp.tools.length} tools over MCP, so Claude Desktop, Claude Code and claude.ai can read and edit your finances.</p>
-          <p class="label" style="margin-top:12px">Claude Code</p><pre class="code">claude mcp add --transport http keel ${origin}/mcp</pre>
-          <p class="label">Claude Desktop (claude_desktop_config.json)</p><pre class="code">{ "mcpServers": { "keel": { "command": "npm", "args": ["--prefix", "/path/to/keel", "run", "-s", "mcp"] } } }</pre>
+        <div class="card col-12"><div class="card-head"><h2 class="h2">Connect Claude to Daybook (MCP)</h2></div>
+          <p class="body-sm muted">Daybook serves the same ${s.mcp.tools.length} tools over MCP, so Claude Desktop, Claude Code and claude.ai can read and edit your finances.</p>
+          <p class="label" style="margin-top:12px">Claude Code</p><pre class="code">claude mcp add --transport http daybook ${origin}/mcp</pre>
+          <p class="label">Claude Desktop (claude_desktop_config.json)</p><pre class="code">{ "mcpServers": { "daybook": { "command": "npm", "args": ["--prefix", "/path/to/keel", "run", "-s", "mcp"] } } }</pre>
           <p class="label">claude.ai custom connector</p><pre class="code">Expose ${origin}/mcp over HTTPS (e.g. <code>tailscale funnel 4242</code> or <code>ngrok http 4242</code>), set KEEL_TOKEN in .env, then add the URL under Settings → Connectors with header Authorization: Bearer &lt;token&gt;.</pre>
           <p class="label">Tools</p><p class="mono-sm muted">${s.mcp.tools.map(esc).join(' · ')}</p></div>
       </div></div>`);

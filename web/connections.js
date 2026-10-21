@@ -64,7 +64,7 @@ function openSimplefinSheet(after) {
     <ol class="body-sm muted steps">
       <li>Open the <a class="link" href="${SIMPLEFIN_URL}" target="_blank" rel="noopener">SimpleFIN Bridge</a> ($15/year, up to 25 banks), sign up and connect your banks there.</li>
       <li>Under <strong>Apps</strong>, choose <strong>New connection</strong> and copy the Setup Token.</li>
-      <li>Paste it here. Keel uses it once, then keeps an encrypted access key on this Mac.</li>
+      <li>Paste it here. Daybook uses it once, then keeps an encrypted access key on this Mac.</li>
     </ol>
     <div class="field"><label for="sf-token">Setup Token</label><textarea class="input" id="sf-token" rows="3" spellcheck="false" autocomplete="off" placeholder="aHR0cHM6Ly9…"></textarea></div>
     <p class="body-sm muted">SimpleFIN refreshes about once a day and sends about 90 days of history. Banks it can’t reach need you to sign in again on the Bridge site.</p>
@@ -93,7 +93,7 @@ export async function openAddAccount(after = onChange) {
       <button class="row" data-add="csv"><span class="disc">📄</span><span class="main"><span class="name">Import a CSV</span><span class="meta">Copilot’s transaction export</span></span><span>${I.forward}</span></button>
     </div>
     ${plaidReady ? '' : `<p class="body-sm muted">Plaid’s free Trial plan covers up to 10 bank logins for life: sign up at dashboard.plaid.com, apply for Trial, and put the Production keys in <code>.env</code> with <code>PLAID_ENV=production</code>. Each real link uses a slot even if you remove it later, so try the flow with <code>PLAID_ENV=sandbox</code> first.</p>`}
-    ${st.auth && !st.auth.token && !st.auth.local ? '<p class="body-sm warn">Connecting banks works from Keel on your Mac, or from any device once KEEL_TOKEN is set.</p>' : ''}
+    ${st.auth && !st.auth.token && !st.auth.local ? '<p class="body-sm warn">Connecting banks works from Daybook on your Mac, or from any device once KEEL_TOKEN is set.</p>' : ''}
   </div>`, { label: 'Add an account' });
   s.el.addEventListener('click', async (e) => {
     const b = e.target.closest('[data-add]');
@@ -165,7 +165,7 @@ async function fix(c) {
 }
 
 async function remove(c, deleteData) {
-  const what = deleteData ? 'and delete its accounts and transactions from Keel' : '(its accounts stay in Keel as manual accounts)';
+  const what = deleteData ? 'and delete its accounts and transactions from Daybook' : '(its accounts stay in Daybook as manual accounts)';
   const extra = c.provider === 'plaid' ? ' Plaid’s free Trial doesn’t give the slot back.' : '';
   if (!confirm(`Disconnect ${c.institution || providerLabel(c.provider)} ${what}?${extra}`)) return;
   try { const r = await api(`/connections/${encodeURIComponent(c.id)}${deleteData ? '?delete_data=1' : ''}`, { method: 'DELETE' }); r.warning ? alert(r.warning) : toast('Disconnected'); } catch (e) { alert(e.message); }

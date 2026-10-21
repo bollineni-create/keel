@@ -1,6 +1,6 @@
 {
-  "name": "Keel",
-  "short_name": "Keel",
+  "name": "Daybook",
+  "short_name": "Daybook",
   "description": "Self-hosted personal finance with a built-in assistant.",
   "start_url": "/#/",
   "scope": "/",

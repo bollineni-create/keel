@@ -1,19 +1,19 @@
 /**
  * SimpleFIN Bridge (https://beta-bridge.simplefin.org): $15/year for up to 25 institutions, backed by MX.
- * The user links banks on the Bridge website, then pastes a one-time Setup Token into Keel. Keel claims
+ * The user links banks on the Bridge website, then pastes a one-time Setup Token into Daybook. Daybook claims
  * it once for an Access URL (Basic-auth credentials inside), stores that encrypted, and polls
  * GET {access}/accounts?version=2. No redirect URIs or webhooks, so it works on localhost.
  *
  * Protocol facts this adapter is built around (https://www.simplefin.org/protocol.html and the Bridge's
  * developer guide, checked October 2026):
- *  - amounts are positive for deposits: Keel negates them (positive = money out)
- *  - ~24 requests a day per token before warnings and then a disabled token: Keel syncs every 4 hours
- *  - date windows over 45 days draw a gen.api warning (and over 90 are capped): Keel asks for ≤45
- *  - ids are scoped (accounts per connection, transactions per account): Keel namespaces them
+ *  - amounts are positive for deposits: Daybook negates them (positive = money out)
+ *  - ~24 requests a day per token before warnings and then a disabled token: Daybook syncs every 4 hours
+ *  - date windows over 45 days draw a gen.api warning (and over 90 are capped): Daybook asks for ≤45
+ *  - ids are scoped (accounts per connection, transactions per account): Daybook namespaces them
  *  - pending rows re-post under new ids: pending rows missing from a fresh window are dropped
  *  - broken bank logins come back as errlist `con.auth`; the user fixes them on the Bridge site
  *  - Node's fetch refuses URLs with credentials, and an old bridge host redirects to the root page:
- *    Keel sends an Authorization header itself and never follows redirects
+ *    Daybook sends an Authorization header itself and never follows redirects
  */
 import { getDb, nowIso, upsert, type Row } from '../db.js';
 import { normalizeAccountType } from './copilot.js';
@@ -76,7 +76,7 @@ async function getAccounts(access: string, params: Record<string, string | numbe
   const qs = new URLSearchParams(Object.entries({ version: 2, ...params }).map(([k, v]) => [k, String(v)]));
   const res = await fetchImpl(`${base}/accounts?${qs}`, { headers: { authorization: `Basic ${auth}`, accept: 'application/json' }, redirect: 'manual' });
   if (res.status >= 300 && res.status < 400) throw new ConnectionError('SimpleFIN moved this connection. Create a new Setup Token on the Bridge and connect again.', 'needs_reauth', 'redirect');
-  if (res.status === 403) throw new ConnectionError(`SimpleFIN rejected Keel's access (revoked or wrong credentials). Create a new Setup Token at ${BRIDGE_URL} and connect again.`, 'needs_reauth', 'http_403');
+  if (res.status === 403) throw new ConnectionError(`SimpleFIN rejected Daybook's access (revoked or wrong credentials). Create a new Setup Token at ${BRIDGE_URL} and connect again.`, 'needs_reauth', 'http_403');
   if (res.status === 402) throw new ConnectionError(`Your SimpleFIN Bridge subscription needs renewing (${BRIDGE_URL}).`, 'error', 'http_402');
   if (!res.ok) throw new ConnectionError(`SimpleFIN returned HTTP ${res.status}.`);
   const messages = (res.headers.get('x-api-message') ?? '').split(/\s*;\s*|\n/).filter(Boolean);
@@ -148,7 +148,7 @@ export function mapSimplefinAccount(a: Json, conn: ConnectionRow, institution: s
     type,
     subtype: null,
     institution,
-    // Keel stores what's owed on a card or loan as a positive balance; feeds disagree on the sign.
+    // Daybook stores what's owed on a card or loan as a positive balance; feeds disagree on the sign.
     balance: liability ? Math.abs(bal) : bal,
     available: num(a['available-balance']),
     limit_amt: null,
@@ -169,7 +169,7 @@ const clean = (s: string) => s.replace(/\s{2,}/g, ' ').replace(/\b(POS|DEBIT|PUR
 export function mapSimplefinTransaction(t: Json, acctId: string, conn: ConnectionRow): Row {
   const posted = num(t.posted) ?? 0;
   const when = posted > 0 ? posted : num(t.transacted_at) ?? Math.floor(Date.now() / 1000);
-  // SimpleFIN: positive = deposit. Keel: positive = money out.
+  // SimpleFIN: positive = deposit. Daybook: positive = money out.
   const amount = Math.round(-(num(t.amount) ?? 0) * 100) / 100;
   const desc = String(t.description ?? '').trim();
   return {
@@ -197,7 +197,7 @@ interface SfinRaw { institutions?: string[]; req_day?: string; req_count?: numbe
 function spendRequest(conn: ConnectionRow, raw: SfinRaw): SfinRaw {
   const day = ymd(new Date());
   const count = raw.req_day === day ? (raw.req_count ?? 0) : 0;
-  if (count >= DAILY_REQUEST_BUDGET) throw new ConnectionError(`Keel has used today's SimpleFIN request budget (${DAILY_REQUEST_BUDGET}); it will sync again tomorrow.`, 'ok', 'budget');
+  if (count >= DAILY_REQUEST_BUDGET) throw new ConnectionError(`Daybook has used today's SimpleFIN request budget (${DAILY_REQUEST_BUDGET}); it will sync again tomorrow.`, 'ok', 'budget');
   const next = { ...raw, req_day: day, req_count: count + 1 };
   updateConnection(conn.id, { raw: JSON.stringify(next) });
   return next;
@@ -227,7 +227,7 @@ export const simplefinProvider: DirectProvider = {
       const connNames = new Map<string, string>((body.connections ?? []).map((c: Json) => [String(c.conn_id), String(c.name ?? c.org_name ?? 'Bank')]));
       for (const e of body.errlist ?? []) {
         const code = String(e.code ?? '');
-        if (code === 'gen.auth') throw new ConnectionError(`SimpleFIN rejected Keel's access. Create a new Setup Token at ${BRIDGE_URL} and connect again.`, 'needs_reauth', code);
+        if (code === 'gen.auth') throw new ConnectionError(`SimpleFIN rejected Daybook's access. Create a new Setup Token at ${BRIDGE_URL} and connect again.`, 'needs_reauth', code);
         if (code === 'con.auth' || code.startsWith('con.')) broken.set(String(e.conn_id ?? ''), connNames.get(String(e.conn_id)) ?? String(e.msg ?? 'a bank'));
         else if (code !== 'gen.api') warnings.push(`SimpleFIN ${code}: ${e.msg ?? ''}`.trim());
       }

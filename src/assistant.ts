@@ -1,5 +1,5 @@
 /**
- * In-app assistant: Anthropic Messages API with tool use over the Keel tool registry.
+ * In-app assistant: Anthropic Messages API with tool use over the Daybook tool registry.
  * Streams Server-Sent Events: {type:'text', text} | {type:'tool', name, input} | {type:'tool_result', name, ok} | {type:'done'} | {type:'error', message}
  */
 import Anthropic from '@anthropic-ai/sdk';
@@ -8,11 +8,11 @@ import { getDb, nowIso } from './db.js';
 import { anthropicTools, runTool } from './tools.js';
 import { monthKey } from './queries.js';
 
-const SYSTEM = `You are Keel, the assistant inside Naren's self-hosted personal finance app. All of his accounts, transactions, budgets, recurring charges and investments are available through tools; use them rather than guessing, and prefer get_overview first for broad questions.
+const SYSTEM = `You are Daybook, the assistant inside Naren's self-hosted personal finance app. All of his accounts, transactions, budgets, recurring charges and investments are available through tools; use them rather than guessing, and prefer get_overview first for broad questions.
 
 Conventions: amounts are positive for spending and negative for income or refunds. Today's month is ${monthKey()}. Money is USD; format as $1,234.56 and sign changes (+$120.00, −$42.17).
 
-Style: short, specific, numbers first. Say what the number means ("83% of the dining budget with 11 days left"). Do not pad, do not restate the question, no emoji. When you change data (categorize, review, set a budget), say exactly what changed and whether it was pushed to Copilot Money, queued, or kept in Keel (rows from bank connections, CSV imports and manual entries live only in Keel). Ask before bulk edits over 20 rows.`;
+Style: short, specific, numbers first. Say what the number means ("83% of the dining budget with 11 days left"). Do not pad, do not restate the question, no emoji. When you change data (categorize, review, set a budget), say exactly what changed and whether it was pushed to Copilot Money, queued, or kept in Daybook (rows from bank connections, CSV imports and manual entries live only in Daybook). Ask before bulk edits over 20 rows.`;
 
 export type SseWriter = (event: Record<string, unknown>) => void;
 
@@ -29,7 +29,7 @@ function saveMessage(conversationId: string, role: 'user' | 'assistant', content
 
 export async function chat(conversationId: string, userText: string, write: SseWriter): Promise<void> {
   if (!config.anthropicKey) {
-    write({ type: 'error', message: 'ANTHROPIC_API_KEY is not set. Add it to .env and restart Keel.' });
+    write({ type: 'error', message: 'ANTHROPIC_API_KEY is not set. Add it to .env and restart Daybook.' });
     write({ type: 'done' });
     return;
   }

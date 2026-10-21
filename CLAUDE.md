@@ -1,10 +1,10 @@
-# Keel — notes for Claude Code sessions
+# Daybook — notes for Claude Code sessions
 
 Self-hosted personal finance app on top of Copilot Money data. Node 20 + TypeScript (Express, better-sqlite3), buildless PWA in `web/`. See README.md for setup and architecture.
 
 ## Design system (source of truth lives outside this repo)
 
-The visual design is the **Keel** Design System artifact in Claude:
+The visual design is the **Daybook** Design System artifact in Claude:
 https://claude.ai/code/artifact/9d7113db-90b9-4825-ad3b-2478a3ab7239
 
 - `design/tokens.json` is a verbatim copy of the artifact's `project/tokens.json`; `design/README.md` mirrors its brand book; `design/components.css` mirrors its `components/bundle.css` (the `.k-*` classes every component preview uses — build screens on these classes, extend them, never fork them).
@@ -27,7 +27,7 @@ https://claude.ai/code/artifact/9d7113db-90b9-4825-ad3b-2478a3ab7239
 
 ## Conventions
 - Amounts: positive = money out, negative = money in (Copilot convention) — every query in `src/queries.ts` assumes it. Plaid already matches; SimpleFIN is negated in its mapper. Card and loan balances are stored as the positive amount owed.
-- Data sources: Copilot (`src/sync/copilot.ts`) and direct bank connections (`src/sync/plaid.ts`, `src/sync/simplefin.ts`) all run through `syncAll()` in `src/sync/index.ts`. Ids are namespaced (`plaid:`, `sfin:`). A Keel-side edit is recorded in the row's `local_edits` (`markEdited`) and sync upserts use `preserveEdited`, so edits survive syncs.
+- Data sources: Copilot (`src/sync/copilot.ts`) and direct bank connections (`src/sync/plaid.ts`, `src/sync/simplefin.ts`) all run through `syncAll()` in `src/sync/index.ts`. Ids are namespaced (`plaid:`, `sfin:`). A Daybook-side edit is recorded in the row's `local_edits` (`markEdited`) and sync upserts use `preserveEdited`, so edits survive syncs.
 - Tools that take or return bank credentials, or add/remove a connection, are `internal: true`: REST only, never the assistant or MCP.
 - One tool registry (`src/tools.ts`) feeds the assistant, `/mcp`, and REST; add capabilities there, not in three places.
 - `npm run typecheck` and `npm test` must pass; `npm run demo` seeds sample data for UI work; screenshots via Playwright (see README).

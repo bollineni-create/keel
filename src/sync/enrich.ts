@@ -27,7 +27,7 @@ export function ensureCategories(): number {
 
 /**
  * Plaid personal_finance_category → words to look for in the user's own category names, most specific
- * first. Matching by name works for both Keel's starter tree and a Copilot tree.
+ * first. Matching by name works for both Daybook's starter tree and a Copilot tree.
  */
 const PFC_HINTS: Array<[prefix: string, words: string[]]> = [
   ['FOOD_AND_DRINK_GROCERIES', ['grocer']], ['FOOD_AND_DRINK_COFFEE', ['coffee']], ['FOOD_AND_DRINK_FAST_FOOD', ['fast food', 'restaurant', 'dining']],
@@ -149,7 +149,7 @@ export function backfillBalances(connectionId: string, accountId?: string): numb
   let n = 0;
   d.transaction(() => {
     for (const a of accts) {
-      // Keel amounts: positive = money out. That lowers a cash balance and raises what's owed on a card.
+      // Daybook amounts: positive = money out. That lowers a cash balance and raises what's owed on a card.
       const owed = a.type === 'credit' || a.type === 'loan';
       let bal = a.balance; // end of today
       let last: string | null = null;

@@ -43,7 +43,7 @@ test('secrets: round trip, tamper detection, redaction', () => {
   assert.match(secrets.redact('token access-sandbox-1234abcd-5678'), /access-sandbox-\*\*\*/);
 });
 
-test('upsert: preserveEdited keeps Keel edits, insertOnly writes once', () => {
+test('upsert: preserveEdited keeps Daybook edits, insertOnly writes once', () => {
   const row = (name: string, category_id: string | null) => ({ id: 'u1', date: '2026-10-01', name, amount: 5, category_id, source: 'copilot' });
   db.upsert('transactions', [row('A', 'c1')], ['id'], { preserveEdited: true });
   db.markEdited('transactions', 'u1', ['category_id']);
@@ -137,7 +137,7 @@ test('simplefin: claim, first sync, sign flip, ids, liabilities, partial failure
   assert.equal(card.balance, 320.1, 'liability stored as positive amount owed');
   assert.equal(card.needs_attention, 1);
   const tj = tx(`${checking.id}:T1`);
-  assert.equal(tj.amount, 42.5, 'SimpleFIN deposit-positive flipped to Keel spend-positive');
+  assert.equal(tj.amount, 42.5, 'SimpleFIN deposit-positive flipped to Daybook spend-positive');
   assert.equal(tj.name, "Trader Joe's");
   assert.equal(tj.source, 'simplefin');
   assert.equal(tx(`${checking.id}:T2`).amount, -2500);
@@ -268,8 +268,8 @@ test('plaid: link token, exchange, sync with pagination restart, pending→poste
   assert.equal(r.connection.institution, 'First Platypus Bank');
   assert.equal(tx('plaid:x'), undefined, 'first attempt discarded after the pagination restart');
   const coffee = tx('plaid:p-pend');
-  assert.equal(coffee.amount, 25.5, 'Plaid amounts already use Keel’s sign');
-  assert.ok(coffee.category_id, 'Plaid category mapped onto a Keel category');
+  assert.equal(coffee.amount, 25.5, 'Plaid amounts already use Daybook’s sign');
+  assert.ok(coffee.category_id, 'Plaid category mapped onto a Daybook category');
   const cat = db.getDb().prepare('SELECT name FROM categories WHERE id = ?').get(coffee.category_id) as any;
   assert.equal(cat.name, 'Coffee');
   assert.equal(tx('plaid:pay').transfer, 1, 'card payment is a transfer');

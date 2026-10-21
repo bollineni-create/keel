@@ -1,4 +1,4 @@
-/* Keel app styles. Colours, type, spacing and radii come from web/tokens.css (generated from design/tokens.json
+/* Daybook app styles. Colours, type, spacing and radii come from web/tokens.css (generated from design/tokens.json
    by `npm run tokens`); component classes (.k-*) come from design/components.css. This file lays out the shell and
    screens and extends those classes — it never introduces raw colours, font sizes or radii. */
 

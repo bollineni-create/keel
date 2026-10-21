@@ -1,9 +1,9 @@
 /**
- * Pulls your Copilot Money data into Keel's SQLite via the community
+ * Pulls your Copilot Money data into Daybook's SQLite via the community
  * `copilot-money-mcp` server (reads the Copilot Mac app's local Firestore cache;
  * with --live-reads/--write it also talks to Copilot's GraphQL API).
  *
- * We speak MCP to it as a client over stdio, so Keel never touches Copilot's
+ * We speak MCP to it as a client over stdio, so Daybook never touches Copilot's
  * cache format or API directly — if their schema drifts, that project absorbs it.
  */
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -69,7 +69,7 @@ export class CopilotClient {
 
 export const copilot = new CopilotClient();
 
-/** The Copilot server is a third-party npx package: don't hand it Keel's own secrets. */
+/** The Copilot server is a third-party npx package: don't hand it Daybook's own secrets. */
 function childEnv(): Record<string, string> {
   const secret = /^(ANTHROPIC_API_KEY|PLAID_|KEEL_TOKEN|KEEL_SECRET_KEY)/;
   return Object.fromEntries(Object.entries(process.env).filter(([k, v]) => v !== undefined && !secret.test(k))) as Record<string, string>;
@@ -143,7 +143,7 @@ async function runSync(): Promise<SyncReport> {
     for (let page = 0; page < 400; page++) {
       const r = await copilot.call(tool, { limit, offset, fields: ['all'], exclude_deleted: true, period: 'all_time' });
       const list: Json[] = r.transactions ?? [];
-      // preserveEdited: what the user changed in Keel and hasn't pushed to Copilot survives the sync.
+      // preserveEdited: what the user changed in Daybook and hasn't pushed to Copilot survives the sync.
       total += upsert('transactions', list.map(mapTransaction).filter(keepTx), ['id'], { preserveEdited: true });
       if (!r.has_more || list.length === 0) break;
       offset += list.length;
@@ -375,7 +375,7 @@ async function replayPendingWrites(): Promise<{ done: number; failed: number }> 
       const args = JSON.parse(w.args);
       await copilot.call(w.tool, args);
       d.prepare(`UPDATE pending_writes SET status = 'done', error = NULL WHERE id = ?`).run(w.id);
-      // Copilot has these values now, so later edits made in Copilot can flow back into Keel.
+      // Copilot has these values now, so later edits made in Copilot can flow back into Daybook.
       const clear = d.prepare(`UPDATE transactions SET local_edits = json_remove(local_edits, ?) WHERE id = ? AND local_edits IS NOT NULL`);
       if (w.tool === 'update_transaction') for (const k of Object.keys(args).filter((k) => k !== 'transaction_id')) clear.run(`$.${k}`, args.transaction_id);
       if (w.tool === 'review_transactions') for (const id of args.transaction_ids ?? []) clear.run('$.reviewed', id);

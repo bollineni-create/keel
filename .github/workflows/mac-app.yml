@@ -1,4 +1,4 @@
-# Compiles Keel.app on a Mac runner whenever the Mac app changes, so a broken build shows up on the PR
+# Compiles Daybook.app on a Mac runner whenever the Mac app changes, so a broken build shows up on the PR
 # instead of on someone's Mac. It builds only; nothing is installed or published.
 name: Build Mac app
 
@@ -25,12 +25,12 @@ jobs:
 
       - run: npm ci
 
-      - name: Build Keel.app (Intel + Apple silicon)
+      - name: Build Daybook.app (Intel + Apple silicon)
         run: ./app/macos/build.sh --no-install
 
       - name: Check the bundle
         run: |
-          plutil -lint build/Keel.app/Contents/Info.plist
-          lipo -archs build/Keel.app/Contents/MacOS/Keel
-          test -f build/Keel.app/Contents/Resources/AppIcon.icns
-          codesign --verify --verbose build/Keel.app
+          plutil -lint build/Daybook.app/Contents/Info.plist
+          lipo -archs build/Daybook.app/Contents/MacOS/Daybook
+          test -f build/Daybook.app/Contents/Resources/AppIcon.icns
+          codesign --verify --verbose build/Daybook.app

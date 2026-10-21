@@ -46,7 +46,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   }
   if (!config.token && connectionCount() > 0) {
     if (!hostAllowed(req.get('host'))) return res.status(403).json({ error: `Host ${req.get('host')} not allowed. Set KEEL_TOKEN, or add it to KEEL_ALLOWED_HOSTS.` });
-    if (!isLocal(req)) return res.status(401).json({ error: 'Keel has bank connections, so other devices need a token: set KEEL_TOKEN in .env and restart, then open Keel with ?token=<it>.' });
+    if (!isLocal(req)) return res.status(401).json({ error: 'Daybook has bank connections, so other devices need a token: set KEEL_TOKEN in .env and restart, then open Daybook with ?token=<it>.' });
   }
   next();
 });
@@ -130,8 +130,8 @@ api.get('/status', (req, res) => {
 });
 api.post('/sync', wrap(async (req, res) => res.json(await syncAll({ ...(req.body ?? {}), force: true }))));
 
-// Bank connections. Adding one hands Keel bank credentials, so without KEEL_TOKEN only this Mac may do it.
-const localOrToken = (req: Request, res: Response, next: NextFunction) => (config.token || isLocal(req) ? next() : res.status(403).json({ error: 'Connect banks from Keel on this Mac, or set KEEL_TOKEN to do it from other devices.' }));
+// Bank connections. Adding one hands Daybook bank credentials, so without KEEL_TOKEN only this Mac may do it.
+const localOrToken = (req: Request, res: Response, next: NextFunction) => (config.token || isLocal(req) ? next() : res.status(403).json({ error: 'Connect banks from Daybook on this Mac, or set KEEL_TOKEN to do it from other devices.' }));
 api.get('/connections', wrap(async (_req, res) => res.json(await runTool('get_connections', {}))));
 api.post('/connections/simplefin', localOrToken, wrap(async (req, res) => res.json(await runTool('add_simplefin_connection', req.body))));
 api.post('/connections/plaid/link-token', localOrToken, wrap(async (req, res) => res.json(await runTool('plaid_create_link_token', req.body ?? {}))));
@@ -197,9 +197,9 @@ app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
 });
 
 app.listen(config.port, config.host, () => {
-  console.log(`Keel  →  http://localhost:${config.port}   (MCP at /mcp, API at /api)`);
+  console.log(`Daybook  →  http://localhost:${config.port}   (MCP at /mcp, API at /api)`);
   if (config.token) console.log(`Token auth on. First open on each device: http://<host>:${config.port}/?token=<KEEL_TOKEN>`);
-  else if (connectionCount() > 0) console.log('Bank connections exist and KEEL_TOKEN is unset: only this Mac can open Keel. Set KEEL_TOKEN to use it from your phone.');
+  else if (connectionCount() > 0) console.log('Bank connections exist and KEEL_TOKEN is unset: only this Mac can open Daybook. Set KEEL_TOKEN to use it from your phone.');
   if (config.syncMinutes > 0) {
     const run = () => syncAll().then((r) => console.log(`[sync] ${JSON.stringify(r.counts)}${r.warnings.length ? ' warnings: ' + r.warnings.join(' | ') : ''}`)).catch((e) => console.error('[sync] failed:', e.message));
     setTimeout(run, 3000);

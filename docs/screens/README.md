@@ -1,10 +1,10 @@
-# Keel screens — build specs for Claude Code
+# Daybook screens — build specs for Claude Code
 
 One file per screen. Each spec is the contract: regions in order, the design-system
 component each region uses, the data it reads (REST route and MCP tool), its states, its
 interactions, and acceptance checks. Wireframes drawn from the tokens are in
 `../visuals/<screen>.svg`; the full behavioural audit of the source app is
-`../copilot-feature-map.md`; components are documented in the Keel design system
+`../copilot-feature-map.md`; components are documented in the Daybook design system
 (artifact) and mirrored as classes in `design/` → `web/tokens.css`.
 
 ## Build order

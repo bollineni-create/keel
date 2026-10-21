@@ -1,4 +1,4 @@
-// Draws Keel's app icon (the mark from web/icon.svg on a macOS-style rounded square) as a 1024px PNG.
+// Draws Daybook's app icon (the open-book mark from web/icon.svg on a macOS-style rounded square) as a 1024px PNG.
 // Run by build.sh: swift make_icon.swift <out.png>
 import AppKit
 
@@ -20,19 +20,31 @@ ctx.setShadow(offset: CGSize(width: 0, height: -14), blur: 30, color: NSColor.bl
 brand.setFill(); shape.fill()
 ctx.restoreGState()
 
-// The mark is drawn in web/icon.svg's 24-unit space, where the square spans 2…22; map that onto `body`.
+// The mark (an open daybook with two entries on its right page) from web/icon.svg, where the square spans
+// 8…56 of a 64-unit box. Here it's in a 24-unit space whose square spans 2…22, mapped onto `body`.
 let unit = body.width / 20
 func pt(_ x: CGFloat, _ y: CGFloat) -> NSPoint { NSPoint(x: inset + (x - 2) * unit, y: S - inset - (y - 2) * unit) }
-let mark = NSBezierPath()
-mark.move(to: pt(7, 17)); mark.line(to: pt(7, 7))                                  // mast
-mark.move(to: pt(7, 17))
-mark.appendArc(withCenter: pt(14, 17), radius: 7 * unit, startAngle: 180, endAngle: 90, clockwise: true)   // sail
-mark.move(to: pt(7, 17)); mark.line(to: pt(17, 17))                                // keel
-mark.lineWidth = 2 * unit
-mark.lineCapStyle = .round
-mark.lineJoinStyle = .round
+let book = NSBezierPath()
+book.move(to: pt(12.0, 8.458))                                                                         // spine, top
+book.curve(to: pt(5.958, 7.417), controlPoint1: pt(10.333, 7.208), controlPoint2: pt(8.042, 7.0))      // left page, top edge
+book.line(to: pt(5.958, 15.958))
+book.curve(to: pt(12.0, 17.0), controlPoint1: pt(8.042, 15.542), controlPoint2: pt(10.333, 15.75))   // left page, bottom edge
+book.curve(to: pt(18.042, 15.958), controlPoint1: pt(13.667, 15.75), controlPoint2: pt(15.958, 15.542))
+book.line(to: pt(18.042, 7.417))                                                                     // right page
+book.curve(to: pt(12.0, 8.458), controlPoint1: pt(15.958, 7.0), controlPoint2: pt(13.667, 7.208))
+book.close()
+book.move(to: pt(12.0, 8.458)); book.line(to: pt(12.0, 17.0))                                          // spine
+book.lineWidth = 1.875 * unit
+book.lineCapStyle = .round
+book.lineJoinStyle = .round
+let entries = NSBezierPath()
+entries.move(to: pt(14.292, 10.958)); entries.line(to: pt(15.958, 10.958))
+entries.move(to: pt(14.292, 13.25)); entries.line(to: pt(15.958, 13.25))
+entries.lineWidth = 1.25 * unit
+entries.lineCapStyle = .round
 NSColor.white.setStroke()
-mark.stroke()
+book.stroke()
+entries.stroke()
 
 NSGraphicsContext.restoreGraphicsState()
 try! rep.representation(using: .png, properties: [:])!.write(to: URL(fileURLWithPath: out))

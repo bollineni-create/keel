@@ -5,11 +5,11 @@
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import { tools, runTool } from './tools.js';
+import { publicTools, runTool } from './tools.js';
 
 export function buildMcpServer(): McpServer {
   const server = new McpServer({ name: 'keel', version: '0.1.0' });
-  for (const t of tools) {
+  for (const t of publicTools) {
     const shape = t.schema instanceof z.ZodObject ? t.schema.shape : {};
     server.registerTool(
       t.name,

@@ -3,6 +3,7 @@
 import { $, $$, h, esc, moneyShort, txAmount, ago, api, cached, invalidate, store, toast, isTyping, isMac, hue, catTag, I, titleBar, iconBtn, sheet, closeTopSheet, closePopover } from './lib.js';
 import { screens as v1, bindShell } from './v1.js';
 import { transactionsScreen } from './transactions.js';
+import { bindConnections } from './connections.js';
 
 const NAV = [
   { path: '/', label: 'Dashboard', icon: I.dashboard },
@@ -62,7 +63,7 @@ async function renderAccounts({ fresh = false } = {}) {
         <div class="acct-group__rows" ${open ? '' : 'hidden'}>${rows.map((a) => `<a class="k-acctnav ${a.hidden || a.closed ? 'k-acctnav--closed' : ''} ${a.id === activeAcct ? 'is-active' : ''}" href="#/transactions?accounts=${encodeURIComponent(a.id)}" title="${esc(a.name)}${a.mask ? ' ··' + esc(a.mask) : ''}${a.closed ? ' (closed)' : a.hidden ? ' (hidden)' : ''}">
           <i class="k-acctnav__dot" style="background:var(--cat-${hue(a.id)})"></i><span class="k-acctnav__name">${esc(a.name)}</span><span class="k-acctnav__bal">${moneyShort(a.balance)}</span></a>`).join('')}</div></div>`;
     }).join('');
-    box.innerHTML = `<div class="k-eyebrow sidebar__eyebrow">My accounts</div>${groups || `<p class="body-sm sidebar__hint">Accounts appear after your first sync.</p>`}`;
+    box.innerHTML = `<div class="k-eyebrow sidebar__eyebrow">My accounts</div>${groups || `<p class="body-sm sidebar__hint">Accounts appear after you connect a bank or sync Copilot.</p>`}`;
   } catch {
     box.innerHTML = '<div class="k-eyebrow sidebar__eyebrow">My accounts</div>';
   }
@@ -80,8 +81,9 @@ async function renderStatus() {
     if (!navigator.onLine) throw new Error('offline');
     status = await api('/status');
     const stale = !status.last_sync || Date.now() - Date.parse(status.last_sync) > 6 * 3600e3;
-    el.innerHTML = `<i class="dot ${stale ? 'dot--warning' : 'dot--ok'}"></i><span>Synced ${ago(status.last_sync)}${status.queued_writes ? ` · ${status.queued_writes} queued` : ''}</span>`;
-    el.classList.toggle('is-stale', stale);
+    const attention = status.connections?.needs_attention ?? 0;
+    el.innerHTML = `<i class="dot ${stale || attention ? 'dot--warning' : 'dot--ok'}"></i><span>Synced ${ago(status.last_sync)}${status.queued_writes ? ` · ${status.queued_writes} queued` : ''}${attention ? ` · ${attention} need${attention === 1 ? 's' : ''} attention` : ''}</span>`;
+    el.classList.toggle('is-stale', stale || attention > 0);
     const steps = await onboarding();
     $('#start-dot').hidden = steps.every((s) => s.done);
   } catch {
@@ -97,7 +99,7 @@ async function onboarding() {
   const summary = await api('/summary').catch(() => ({ unreviewed: 0 }));
   const manual = store.get('keel-onboarding', {});
   return [
-    { id: 'sync', label: 'Sync your Copilot data', hint: 'Pull accounts and transactions from the Copilot Mac app.', done: Boolean(s.last_sync), action: ['Open settings', openSettings] },
+    { id: 'sync', label: 'Connect your accounts', hint: 'Link banks with Plaid or SimpleFIN, or sync from the Copilot Mac app.', done: Boolean(s.last_sync), action: ['Open settings', openSettings] },
     { id: 'review', label: 'Review your transactions', hint: summary.unreviewed ? `${summary.unreviewed} waiting.` : 'All caught up.', done: !summary.unreviewed, action: ['Review', () => (location.hash = '#/transactions?statuses=unreviewed')] },
     { id: 'budget', label: 'Set a budget', hint: 'Give at least one category a monthly budget.', done: s.counts.budgets > 0, action: ['Categories', () => (location.hash = '#/categories')] },
     { id: 'mcp', label: 'Connect Claude over MCP', hint: 'Claude Desktop, Claude Code or claude.ai can read and edit your finances.', done: Boolean(manual.mcp), manual: true, action: ['Show me how', openSettings] },
@@ -279,6 +281,7 @@ addEventListener('hashchange', navigate);
 addEventListener('online', renderStatus);
 addEventListener('offline', renderStatus);
 bindShell({ navigate, refreshChrome });
+bindConnections(() => { refreshChrome(); navigate(); });
 renderStatic();
 renderAccounts();
 renderStatus();

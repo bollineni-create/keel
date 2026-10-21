@@ -26,7 +26,9 @@ https://claude.ai/code/artifact/9d7113db-90b9-4825-ad3b-2478a3ab7239
 - The current `web/` app is v1 (single pane, dark-first). The target is the three-pane shell in `docs/screens/shell.md`; migrate screen by screen, keeping `src/tools.ts` and `src/queries.ts` as the data layer and adding the routes each spec lists under **Data**.
 
 ## Conventions
-- Amounts: positive = money out, negative = money in (Copilot convention) — every query in `src/queries.ts` assumes it.
+- Amounts: positive = money out, negative = money in (Copilot convention) — every query in `src/queries.ts` assumes it. Plaid already matches; SimpleFIN is negated in its mapper. Card and loan balances are stored as the positive amount owed.
+- Data sources: Copilot (`src/sync/copilot.ts`) and direct bank connections (`src/sync/plaid.ts`, `src/sync/simplefin.ts`) all run through `syncAll()` in `src/sync/index.ts`. Ids are namespaced (`plaid:`, `sfin:`). A Keel-side edit is recorded in the row's `local_edits` (`markEdited`) and sync upserts use `preserveEdited`, so edits survive syncs.
+- Tools that take or return bank credentials, or add/remove a connection, are `internal: true`: REST only, never the assistant or MCP.
 - One tool registry (`src/tools.ts`) feeds the assistant, `/mcp`, and REST; add capabilities there, not in three places.
-- `npm run typecheck` must pass; `npm run demo` seeds sample data for UI work; screenshots via Playwright (see README).
+- `npm run typecheck` and `npm test` must pass; `npm run demo` seeds sample data for UI work; screenshots via Playwright (see README).
 - Never commit `.env` or `data/`.

@@ -21,6 +21,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
     var titleObservation: NSKeyValueObservation?
     var env: [String: String] = [:]
     var sigterm: DispatchSourceSignal?
+    var popups: [NSWindow] = []                            // bank sign-in windows opened by Plaid Link
 
     lazy var root: URL? = {
         guard let path = Bundle.main.object(forInfoDictionaryKey: "KeelSourceFolder") as? String, !path.isEmpty else { return nil }
@@ -39,6 +40,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
 
         let config = WKWebViewConfiguration()
         config.websiteDataStore = .default()               // keeps the token cookie, theme, saved views
+        config.preferences.javaScriptCanOpenWindowsAutomatically = true   // Plaid Link's bank sign-in pop-up
         webView = WKWebView(frame: .zero, configuration: config)
         webView.navigationDelegate = self
         webView.uiDelegate = self
@@ -306,6 +308,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
             handleCommand(url.host ?? "")
             return decisionHandler(.cancel)
         }
+        // Frames inside Keel's page (Plaid Link's iframe) load where they like; only the page itself is kept to Keel.
+        if action.targetFrame?.isMainFrame == false { return decisionHandler(.allow) }
         let isKeel = (url.host == "127.0.0.1" || url.host == "localhost") && url.port == port
         if url.scheme?.hasPrefix("http") == true && !isKeel {
             NSWorkspace.shared.open(url)                    // Get help, docs and other links open in the browser
@@ -346,8 +350,35 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
 
     func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration,
                  for action: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
-        if let url = action.request.url { NSWorkspace.shared.open(url) }
-        return nil
+        // Plaid Link (an iframe) opens the bank's sign-in in a pop-up that reports back to its opener, so that
+        // pop-up has to stay in the app. Links the page itself opens still go to the default browser.
+        let fromFrame = !action.sourceFrame.isMainFrame || webView !== self.webView
+        guard fromFrame else {
+            if let url = action.request.url { NSWorkspace.shared.open(url) }
+            return nil
+        }
+        let popup = WKWebView(frame: .zero, configuration: configuration)
+        popup.uiDelegate = self                              // no navigation delegate: the bank's pages may go anywhere
+        let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 520, height: 720),
+                         styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
+        w.isReleasedWhenClosed = false
+        w.title = "Sign in to your bank"
+        w.contentView = popup
+        w.center()
+        w.makeKeyAndOrderFront(nil)
+        popups.append(w)
+        NotificationCenter.default.addObserver(self, selector: #selector(popupWillClose(_:)), name: NSWindow.willCloseNotification, object: w)
+        return popup
+    }
+
+    @objc func popupWillClose(_ note: Notification) {
+        guard let w = note.object as? NSWindow else { return }
+        NotificationCenter.default.removeObserver(self, name: NSWindow.willCloseNotification, object: w)
+        popups.removeAll { $0 === w }
+    }
+
+    func webViewDidClose(_ webView: WKWebView) {
+        popups.first { $0.contentView === webView }?.close()
     }
 
     func webView(_ webView: WKWebView, runOpenPanelWith parameters: WKOpenPanelParameters, initiatedByFrame frame: WKFrameInfo,

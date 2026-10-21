@@ -1,6 +1,7 @@
 // Keel v1 screens (single-pane card grid). They render inside the shell's main pane and get
 // migrated to the three-pane specs in docs/screens/ one at a time; Transactions lives in transactions.js.
 import { $, h, esc, money, pct, today, thisMonth, monthLabel, monthShort, shiftMonth, dateLabel, api, toast, store, I, sheet, emptyState } from './lib.js';
+import { connectionsCard, openAddAccount } from './connections.js';
 
 let navigate = () => {}, refreshChrome = () => {};
 export function bindShell(fns) { ({ navigate, refreshChrome } = fns); }
@@ -127,12 +128,15 @@ export const screens = {
     const delta = first != null ? last - first : null;
     const step = Math.max(1, Math.floor(hist.length / 6));
     const labels = hist.map((p, i) => (i % step === 0 || i === hist.length - 1 ? new Date(p.date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: days <= 90 ? 'numeric' : undefined }) : ''));
-    return `<div class="screen-head"><div><div class="label">Net worth</div><h1 class="amount-xl">${money(a.net_worth.total, { cents: false })}</h1>${delta != null ? `<p class="body-sm ${delta >= 0 ? 'pos' : 'neg'}">${money(delta, { sign: true, cents: false })} over ${days} days</p>` : ''}</div>
-        <div class="seg">${[30, 90, 365, 1095].map((d) => `<a href="#/accounts?days=${d}"><button class="${d === days ? 'active' : ''}">${d === 30 ? '1M' : d === 90 ? '3M' : d === 365 ? '1Y' : '3Y'}</button></a>`).join('')}</div></div>
+    const el = h(`<div><div class="screen-head"><div><div class="label">Net worth</div><h1 class="amount-xl">${money(a.net_worth.total, { cents: false })}</h1>${delta != null ? `<p class="body-sm ${delta >= 0 ? 'pos' : 'neg'}">${money(delta, { sign: true, cents: false })} over ${days} days</p>` : ''}</div>
+        <div class="actions"><div class="seg">${[30, 90, 365, 1095].map((d) => `<a href="#/accounts?days=${d}"><button class="${d === days ? 'active' : ''}">${d === 30 ? '1M' : d === 90 ? '3M' : d === 365 ? '1Y' : '3Y'}</button></a>`).join('')}</div><button class="btn primary" data-act="add-account">${I.plus}Add account</button></div></div>
       <div class="grid">
         <div class="card col-12">${lineChart([{ values: hist.map((p) => p.net_worth) }], { labels, height: 200 })}</div>
-        ${types.map(([t, label]) => { const rows = a.accounts.filter((x) => x.type === t); if (!rows.length) return ''; const sum = rows.reduce((s, x) => s + x.balance, 0); const liab = t === 'credit' || t === 'loan'; return `<div class="card col-6"><div class="card-head"><h2 class="h2">${label}</h2><span class="amount ${liab ? 'neg' : ''}">${money(liab ? -sum : sum)}</span></div><div class="rows">${rows.map((x) => `<a class="row" href="#/transactions?accounts=${esc(x.id)}"><span class="disc">${t === 'credit' ? '💳' : t === 'investment' ? '📈' : t === 'loan' ? '🏦' : '🏛️'}</span><span class="main"><span class="name">${esc(x.name)}</span><span class="meta">${esc(x.institution || '')}${x.mask ? ' ••' + esc(x.mask) : ''}${x.limit_amt ? ` · ${pct((x.balance / x.limit_amt) * 100)} of ${money(x.limit_amt, { cents: false })}` : ''}</span></span><span class="amount ${liab ? 'neg' : ''}">${money(liab ? -x.balance : x.balance)}</span></a>`).join('')}</div></div>`; }).join('')}
-      </div>`;
+        ${!a.accounts.length ? `<div class="card col-12">${emptyState('No accounts yet. Add one to connect a bank directly, or sync from Copilot in Settings.', I.landmark)}</div>` : ''}
+        ${types.map(([t, label]) => { const rows = a.accounts.filter((x) => x.type === t); if (!rows.length) return ''; const sum = rows.reduce((s, x) => s + x.balance, 0); const liab = t === 'credit' || t === 'loan'; return `<div class="card col-6"><div class="card-head"><h2 class="h2">${label}</h2><span class="amount ${liab ? 'neg' : ''}">${money(liab ? -sum : sum)}</span></div><div class="rows">${rows.map((x) => `<a class="row" href="#/transactions?accounts=${esc(x.id)}"><span class="disc">${t === 'credit' ? '💳' : t === 'investment' ? '📈' : t === 'loan' ? '🏦' : '🏛️'}</span><span class="main"><span class="name">${esc(x.name)}</span><span class="meta">${x.needs_attention ? '<span class="chip amber">Verification needed</span>' : ''}${esc(x.institution || '')}${x.mask ? ' ••' + esc(x.mask) : ''}${x.limit_amt ? ` · ${pct((x.balance / x.limit_amt) * 100)} of ${money(x.limit_amt, { cents: false })}` : ''}${x.source === 'manual' ? ' · Manual' : ''}</span></span><span class="amount ${liab ? 'neg' : ''}">${money(liab ? -x.balance : x.balance)}</span></a>`).join('')}</div></div>`; }).join('')}
+      </div></div>`);
+    el.querySelector('[data-act="add-account"]').addEventListener('click', () => openAddAccount());
+    return el;
   },
 
   async '/investments'() {
@@ -200,8 +204,8 @@ export const screens = {
     const el = h(`<div>
       <div class="screen-head"><h2 class="h2">Settings</h2><button class="k-btn k-btn--icon" data-act="close-sheet" aria-label="Close">${I.x}</button></div>
       <div class="grid">
-        <div class="card col-6"><div class="card-head"><h2 class="h2">Data</h2><button class="btn primary" id="sync">Sync from Copilot</button></div>
-          <dl class="kv"><dt>Last sync</dt><dd>${s.last_sync ? new Date(s.last_sync).toLocaleString() : 'never'}</dd><dt>Source</dt><dd>${esc(s.copilot.command + ' ' + s.copilot.args.join(' '))}</dd><dt>Mode</dt><dd>${s.copilot.write ? 'live + write-through' : s.copilot.live ? 'live reads' : 'local cache (offline)'}</dd><dt>Queued writes</dt><dd>${s.queued_writes}</dd>${Object.entries(s.counts).map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl>
+        <div class="card col-6"><div class="card-head"><h2 class="h2">Data</h2><button class="btn primary" id="sync">Sync now</button></div>
+          <dl class="kv"><dt>Last sync</dt><dd>${s.last_sync ? new Date(s.last_sync).toLocaleString() : 'never'}</dd><dt>Copilot</dt><dd>${s.copilot.enabled ? esc(s.copilot.command + ' ' + s.copilot.args.join(' ')) : 'off (KEEL_COPILOT=off)'}</dd>${s.copilot.enabled ? `<dt>Mode</dt><dd>${s.copilot.write ? 'live + write-through' : s.copilot.live ? 'live reads' : 'local cache (offline)'}</dd><dt>Queued writes</dt><dd>${s.queued_writes}</dd>` : ''}<dt>Bank connections</dt><dd>${s.connections.total}${s.connections.needs_attention ? ` (${s.connections.needs_attention} need attention)` : ''}</dd>${Object.entries(s.counts).map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl>
           ${s.last_sync_report?.warnings?.length ? `<p class="body-sm warn" style="margin-top:12px">${s.last_sync_report.warnings.map(esc).join('<br>')}</p>` : ''}
           <div style="margin-top:16px"><label class="label">Import Copilot CSV export</label><input type="file" id="csv" accept=".csv,text/csv" class="input" style="margin-top:6px"></div></div>
         <div class="card col-6"><div class="card-head"><h2 class="h2">Assistant</h2><span class="chip ${s.assistant.configured ? 'brand' : 'amber'}">${s.assistant.configured ? 'ready' : 'no API key'}</span></div>
@@ -215,7 +219,8 @@ export const screens = {
           <p class="label">claude.ai custom connector</p><pre class="code">Expose ${origin}/mcp over HTTPS (e.g. <code>tailscale funnel 4242</code> or <code>ngrok http 4242</code>), set KEEL_TOKEN in .env, then add the URL under Settings → Connectors with header Authorization: Bearer &lt;token&gt;.</pre>
           <p class="label">Tools</p><p class="mono-sm muted">${s.mcp.tools.map(esc).join(' · ')}</p></div>
       </div></div>`);
-    $('#sync', el).addEventListener('click', async (e) => { e.target.disabled = true; e.target.textContent = 'Syncing…'; try { const r = await api('/sync', { method: 'POST' }); toast(`Synced: ${Object.entries(r.counts).map(([k, v]) => `${v} ${k}`).join(', ')}`); if (r.warnings.length) alert('Sync warnings:\n' + r.warnings.join('\n')); e.target.disabled = false; e.target.textContent = 'Sync from Copilot'; refreshChrome(); navigate(); } catch (err) { alert('Sync failed: ' + err.message); e.target.disabled = false; e.target.textContent = 'Sync from Copilot'; } });
+    $('#sync', el).addEventListener('click', async (e) => { e.target.disabled = true; e.target.textContent = 'Syncing…'; try { const r = await api('/sync', { method: 'POST' }); toast(`Synced: ${Object.entries(r.counts).map(([k, v]) => `${v} ${k}`).join(', ') || 'nothing new'}`); if (r.warnings.length) alert('Sync warnings:\n' + r.warnings.join('\n')); e.target.disabled = false; e.target.textContent = 'Sync now'; refreshChrome(); navigate(); } catch (err) { alert('Sync failed: ' + err.message); e.target.disabled = false; e.target.textContent = 'Sync now'; } });
+    try { $('.grid', el).prepend(await connectionsCard()); } catch (err) { $('.grid', el).prepend(h(`<div class="card col-12"><p class="body-sm warn">Bank connections: ${esc(err.message)}</p></div>`)); }
     $('#csv', el).addEventListener('change', async (e) => { const f = e.target.files[0]; if (!f) return; const fd = new FormData(); fd.append('file', f); try { const r = await api('/import/csv', { method: 'POST', body: fd, headers: {} }); toast(`Imported ${r.imported} rows (${r.skipped} skipped)`); refreshChrome(); navigate(); } catch (err) { alert('Import failed: ' + err.message); } });
     $('#theme', el).addEventListener('click', (e) => { const next = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light'; document.documentElement.dataset.theme = next; store.set('keel-theme', next); e.target.classList.toggle('on', next === 'light'); });
     return el;

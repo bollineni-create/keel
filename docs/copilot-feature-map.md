@@ -157,7 +157,7 @@ sheet.
 
 Sections: **Demo mode** · **Features** (Budgeting toggle, Tags ›) · **Connections** (Manage your connections ›) · **Appearance** (Dark mode: Automatic / Light / Dark) · **Copilot Labs** (Amazon, Venmo) · **Notifications** (Bank fee alert, Big expense alert, Budgets updates, Credit utilization alert, Income update, Low balance alert, Recurring paid alert, Spending update, Uncategorized transfer alert — toggles) · **Rollovers** (Enable rollovers) · Account / Export / Sign out.
 
-Keel equivalents: Data (sync, CSV import, write-through mode) · Assistant (API key status, model) · Appearance · Notifications (reuse list; delivered via the assistant/MCP) · MCP connection instructions.
+Keel equivalents: Bank connections (Plaid / SimpleFIN, the Connections › equivalent) · Data (sync, CSV import, write-through mode) · Assistant (API key status, model) · Appearance · Notifications (reuse list; delivered via the assistant/MCP) · MCP connection instructions.
 
 ---
 

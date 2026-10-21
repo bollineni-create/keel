@@ -6,7 +6,7 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { config } from './config.js';
 import { getDb, getMeta } from './db.js';
 import { buildMcpServer } from './mcp.js';
-import { chat } from './assistant.js';
+import { chat, listConversations } from './assistant.js';
 import { tools, runTool } from './tools.js';
 import * as q from './queries.js';
 import { syncFromCopilot } from './sync/copilot.js';
@@ -97,21 +97,29 @@ api.post('/import/csv', upload.single('file'), wrap(async (req, res) => {
   if (!text) return res.status(400).json({ error: 'Send a CSV file as multipart field "file" or JSON {text}' });
   res.json(importCopilotCsv(text));
 }));
+api.get('/chat', (_req, res) => res.json(listConversations()));
 api.get('/chat/:conversationId', (req, res) => {
   const rows = getDb().prepare('SELECT role, content, created_at FROM chat_messages WHERE conversation_id = ? ORDER BY id').all(req.params.conversationId) as any[];
   res.json(rows.map((r) => ({ ...r, content: JSON.parse(r.content) })));
+});
+api.delete('/chat', (_req, res) => {
+  const n = getDb().prepare('DELETE FROM chat_messages').run().changes;
+  res.json({ ok: true, deleted: n });
 });
 api.delete('/chat/:conversationId', (req, res) => {
   getDb().prepare('DELETE FROM chat_messages WHERE conversation_id = ?').run(req.params.conversationId);
   res.json({ ok: true });
 });
 api.post('/assistant', async (req, res) => {
-  const { conversation_id = 'default', message } = req.body ?? {};
+  const { conversation_id = 'default', message, context } = req.body ?? {};
   if (typeof message !== 'string' || !message.trim()) return res.status(400).json({ error: 'message required' });
   res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive', 'X-Accel-Buffering': 'no' });
-  const write = (ev: Record<string, unknown>) => res.write(`data: ${JSON.stringify(ev)}\n\n`);
+  const write = (ev: Record<string, unknown>) => { if (!res.writableEnded) res.write(`data: ${JSON.stringify(ev)}\n\n`); };
+  const abort = new AbortController();
+  res.on('close', () => abort.abort());
+  const ctx = context && typeof context === 'object' ? { screen: str(context.screen), route: str(context.route) } : undefined;
   try {
-    await chat(String(conversation_id), message, write);
+    await chat(String(conversation_id), message, write, { context: ctx, signal: abort.signal });
   } catch (e) {
     write({ type: 'error', message: (e as Error).message });
     write({ type: 'done' });

@@ -117,6 +117,10 @@ export const I = {
   menu: svg('<path d="M4 12h16M4 6h16M4 18h16"/>'),
   arrowLeft: svg('<path d="m12 19-7-7 7-7"/><path d="M19 12H5"/>'),
   transfer: svg('<path d="m16 3 4 4-4 4"/><path d="M20 7H4"/><path d="m8 21-4-4 4-4"/><path d="M4 17h16"/>'),
+  send: svg('<path d="m5 12 7-7 7 7"/><path d="M12 19V5"/>'),
+  stop: svg('<rect width="12" height="12" x="6" y="6" rx="2"/>'),
+  expand: svg('<path d="M15 3h6v6"/><path d="m21 3-7 7"/><path d="m3 21 7-7"/><path d="M9 21H3v-6"/>'),
+  sparkle: svg('<path d="M9.9 2.6 11.6 7a2 2 0 0 0 1.2 1.2l4.4 1.7a.6.6 0 0 1 0 1.1l-4.4 1.7a2 2 0 0 0-1.2 1.2l-1.7 4.4a.6.6 0 0 1-1.1 0l-1.7-4.4a2 2 0 0 0-1.2-1.2L1.5 11a.6.6 0 0 1 0-1.1l4.4-1.7A2 2 0 0 0 7.1 7l1.7-4.4a.6.6 0 0 1 1.1 0Z"/><path d="M20 3v4"/><path d="M22 5h-4"/>'),
 };
 
 // ---------- title bar ----------

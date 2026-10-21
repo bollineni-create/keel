@@ -1,11 +1,11 @@
 import AppKit
 import WebKit
 
-// Keel: a native window around the Keel PWA, in the same mould as Palimpsest's Mac app.
+// Keel: a native window around the Keel PWA, in the same mould as Palimpsest's and Gridline's Mac apps.
 // The app runs Keel's Node server from the project folder named in Info.plist (KeelSourceFolder), or uses one
-// that's already running (a launchd agent, `npm start`), and shows it in a WKWebView. Quitting stops the server
-// only if the app started it. Files under web/ reload the window when they change; files under src/ restart
-// the server the app owns.
+// that's already running (a launchd agent, `npm start`), and shows it in a WKWebView. Closing the window hides
+// it, so the server keeps serving your phone and Claude; Quit stops the server only if the app started it.
+// Files under web/ reload the window when they change; files under src/ restart the server the app owns.
 
 final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNavigationDelegate, WKUIDelegate, WKDownloadDelegate {
     var window: NSWindow!
@@ -20,6 +20,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
     var lastDownload: URL?
     var titleObservation: NSKeyValueObservation?
     var env: [String: String] = [:]
+    var sigterm: DispatchSourceSignal?
 
     lazy var root: URL? = {
         guard let path = Bundle.main.object(forInfoDictionaryKey: "KeelSourceFolder") as? String, !path.isEmpty else { return nil }
@@ -65,10 +66,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
 
         connect()
         Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in self?.checkForChanges() }
+
+        // `pkill Keel` (or a logout) quits through applicationShouldTerminate, so the server never outlives the app.
+        signal(SIGTERM, SIG_IGN)
+        sigterm = DispatchSource.makeSignalSource(signal: SIGTERM, queue: .main)
+        sigterm?.setEventHandler { NSApp.terminate(nil) }
+        sigterm?.resume()
         NSApp.activate(ignoringOtherApps: true)
     }
 
-    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
+    // The red close button hides the window instead of quitting, so the server keeps serving your phone and the
+    // MCP endpoint. Clicking the Dock icon brings it back; Quit (⌘Q) ends the app.
+    func windowShouldClose(_ sender: NSWindow) -> Bool {
+        sender.orderOut(nil)
+        return false
+    }
+
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        if !flag { window.makeKeyAndOrderFront(nil) }
+        return true
+    }
+
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         quitting = true

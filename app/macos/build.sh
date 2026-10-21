@@ -1,7 +1,7 @@
 #!/bin/zsh
 # Builds Keel.app for macOS from this repository.
 #
-#   ./app/macos/build.sh               build into build/ and install into /Applications   (npm run app)
+#   ./app/macos/build.sh               build into build/, install into /Applications and open it   (npm run app)
 #   ./app/macos/build.sh --no-install  build only
 #
 # The app runs Keel's server from this folder (so your data stays in data/ and code changes show up without
@@ -42,8 +42,14 @@ codesign --force --deep --sign - "$APP"
 echo "Built $APP (runs Keel from $ROOT)"
 
 if [[ "${1:-}" != "--no-install" ]]; then
+  # Quit a running copy the normal way so it stops the server it started
+  if pgrep -x Keel >/dev/null; then
+    osascript -e 'tell application id "local.keel.money" to quit' >/dev/null 2>&1 || true
+    sleep 1
+  fi
   pkill -x Keel 2>/dev/null || true
   rm -rf /Applications/Keel.app
   cp -R "$APP" /Applications/
   echo "Installed /Applications/Keel.app"
+  open /Applications/Keel.app
 fi

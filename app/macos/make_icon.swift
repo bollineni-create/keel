@@ -1,4 +1,4 @@
-// Draws Daybook's app icon (the D mark from web/icon.svg on a macOS-style rounded square) as a 1024px PNG.
+// Draws Daybook's app icon (the spine-and-pages D from web/icon.svg on a macOS-style rounded square) as a 1024px PNG.
 // Run by build.sh: swift make_icon.swift <out.png>
 import AppKit
 
@@ -20,26 +20,21 @@ ctx.setShadow(offset: CGSize(width: 0, height: -14), blur: 30, color: NSColor.bl
 brand.setFill(); shape.fill()
 ctx.restoreGState()
 
-// The mark from web/icon.svg (a D whose two cut-out lines are a daybook's first entries), drawn in that
-// file's 64-unit box, which maps onto `body`.
+// The mark from web/icon.svg (a book seen from the spine: the spine, then its pages, which together
+// make a D), drawn in that file's 64-unit box, which maps onto `body`.
 let k = body.width / 64
 func pt(_ x: CGFloat, _ y: CGFloat) -> NSPoint { NSPoint(x: inset + x * k, y: S - inset - y * k) }
-let mark = NSBezierPath()
-mark.windingRule = .evenOdd
-mark.move(to: pt(19, 14))
-mark.line(to: pt(31, 14))
-mark.appendArc(withCenter: pt(31, 32), radius: 18 * k, startAngle: 90, endAngle: -90, clockwise: true)   // the D's bowl
-mark.line(to: pt(19, 50))
-mark.appendArc(withCenter: pt(19, 47), radius: 3 * k, startAngle: -90, endAngle: 180, clockwise: true)
-mark.line(to: pt(16, 17))
-mark.appendArc(withCenter: pt(19, 17), radius: 3 * k, startAngle: 180, endAngle: 90, clockwise: true)
-mark.close()
-for (x, y, w) in [(23.0, 25.0, 17.0), (23.0, 34.0, 11.0)] {                                                 // the two entries
-    let r = NSRect(origin: pt(CGFloat(x), CGFloat(y + 5)), size: NSSize(width: CGFloat(w) * k, height: 5 * k))
-    mark.append(NSBezierPath(roundedRect: r, xRadius: 2.5 * k, yRadius: 2.5 * k))
-}
+let spine = NSBezierPath(roundedRect: NSRect(origin: pt(15, 51), size: NSSize(width: 7.5 * k, height: 38 * k)), xRadius: 3 * k, yRadius: 3 * k)
+let pages = NSBezierPath()
+pages.move(to: pt(25, 13))
+pages.line(to: pt(30, 13))
+pages.curve(to: pt(49, 32), controlPoint1: pt(42.2, 13), controlPoint2: pt(49, 20.6))
+pages.curve(to: pt(30, 51), controlPoint1: pt(49, 43.4), controlPoint2: pt(42.2, 51))
+pages.line(to: pt(25, 51))
+pages.close()
 NSColor.white.setFill()
-mark.fill()
+spine.fill()
+pages.fill()
 
 NSGraphicsContext.restoreGraphicsState()
 try! rep.representation(using: .png, properties: [:])!.write(to: URL(fileURLWithPath: out))

@@ -9,13 +9,15 @@ interactions, and acceptance checks. Wireframes drawn from the tokens are in
 
 ## Build order
 
-1. **Shell** — three-pane layout, sidebar (nav + MY ACCOUNTS + footer), title bars,
+1. ✅ **Shell** — three-pane layout, sidebar (nav + MY ACCOUNTS + footer), title bars,
    phone tab bar + detail sheet. Everything else slots into it.
-2. **Transactions** — the densest screen; builds TransactionRow, CategoryTag, Filter/Sort
+2. ✅ **Transactions** — the densest screen; builds TransactionRow, CategoryTag, Filter/Sort
    popovers, detail pane, bulk bar. Reused by Accounts and Recurrings detail panes.
 3. **Dashboard** — composes cards from the other screens' read models.
 4. **Accounts** → **Categories** → **Recurrings** → **Investments** → **Cash flow** → **Goals**.
 5. **Settings** sheet, **Assistant** (already built; restyle to the shell).
+
+Screens without a ✅ still render their v1 version (`web/v1.js`) inside the shell's main pane.
 
 ## Rules that apply to every screen
 

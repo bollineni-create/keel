@@ -142,6 +142,28 @@
   --radius-pill: 999px;
   --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --type-h1: 600 22px/28px var(--font-sans);
+  --track-h1: -0.01em;
+  --type-title: 600 15px/20px var(--font-sans);
+  --track-title: normal;
+  --type-h2: 600 15px/20px var(--font-sans);
+  --track-h2: normal;
+  --type-body: 500 13px/18px var(--font-sans);
+  --track-body: normal;
+  --type-body-sm: 400 12px/16px var(--font-sans);
+  --track-body-sm: normal;
+  --type-eyebrow: 600 11px/14px var(--font-sans);
+  --track-eyebrow: 0.06em;
+  --type-tag: 700 10px/14px var(--font-sans);
+  --track-tag: 0.04em;
+  --type-hero: 600 28px/32px var(--font-mono);
+  --track-hero: -0.02em;
+  --type-hero-sm: 600 20px/24px var(--font-mono);
+  --track-hero-sm: -0.01em;
+  --type-amount: 600 13px/18px var(--font-mono);
+  --track-amount: normal;
+  --type-amount-sm: 500 11px/14px var(--font-mono);
+  --track-amount-sm: normal;
 }
 .h1 { font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif; font-size: 22px; line-height: 28px; font-weight: 600; letter-spacing: -0.01em; }
 .title { font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif; font-size: 15px; line-height: 20px; font-weight: 600; }

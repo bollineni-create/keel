@@ -38,6 +38,7 @@ CREATE TABLE IF NOT EXISTS transactions (
   pending INTEGER DEFAULT 0, reviewed INTEGER DEFAULT 0, excluded INTEGER DEFAULT 0,
   transfer INTEGER DEFAULT 0, income INTEGER DEFAULT 0,
   note TEXT, recurring_id TEXT, tags TEXT,
+  split INTEGER DEFAULT 0, split_parent_id TEXT, goal_id TEXT,
   source TEXT DEFAULT 'copilot', raw TEXT, updated_at TEXT
 );
 CREATE INDEX IF NOT EXISTS tx_date ON transactions(date);
@@ -93,7 +94,23 @@ export function getDb(): Database.Database {
   db.pragma('journal_mode = WAL');
   db.pragma('foreign_keys = ON');
   db.exec(SCHEMA);
+  migrate(db);
   return db;
+}
+
+/** Columns added after a table first shipped; CREATE TABLE IF NOT EXISTS won't add them to an existing db. */
+const ADDED_COLUMNS: Array<[table: string, column: string, decl: string]> = [
+  ['transactions', 'split', 'INTEGER DEFAULT 0'],
+  ['transactions', 'split_parent_id', 'TEXT'],
+  ['transactions', 'goal_id', 'TEXT'],
+];
+
+function migrate(d: Database.Database): void {
+  for (const [table, column, decl] of ADDED_COLUMNS) {
+    const cols = d.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
+    if (!cols.some((c) => c.name === column)) d.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${decl}`);
+  }
+  d.exec('CREATE INDEX IF NOT EXISTS tx_split_parent ON transactions(split_parent_id)');
 }
 
 export function getMeta(key: string): string | undefined {

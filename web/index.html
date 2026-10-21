@@ -1,12 +1,12 @@
 <!doctype html>
-<html lang="en" data-theme="dark">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Keel</title>
 <meta name="description" content="Self-hosted personal finance with a built-in assistant.">
-<meta name="theme-color" content="#0d1014" media="(prefers-color-scheme: dark)">
-<meta name="theme-color" content="#f4f3ee" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#171b21" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Keel">
@@ -15,23 +15,18 @@
 <link rel="apple-touch-icon" href="/icon-180.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/tokens.css">
+<link rel="stylesheet" href="/components.css">
 <link rel="stylesheet" href="/styles.css">
-<script>try{var t=localStorage.getItem('keel-theme');if(t)document.documentElement.dataset.theme=t;else if(matchMedia('(prefers-color-scheme: light)').matches)document.documentElement.dataset.theme='light';}catch(e){}</script>
+<script>(function(){var t,r=null;try{r=localStorage.getItem('keel-theme');t=JSON.parse(r)}catch(e){t=r}document.documentElement.dataset.theme=t||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');})();</script>
 </head>
-<body>
-<div class="app">
-  <aside class="sidebar">
-    <a class="brand" href="#/"><svg viewBox="0 0 24 24" fill="none"><rect x="2" y="2" width="20" height="20" rx="6" fill="var(--brand)"/><path d="M7 17V7m0 10a7 7 0 0 1 7-7m-7 7h10" stroke="var(--brand-ink)" stroke-width="2" stroke-linecap="round"/></svg>Keel</a>
-    <nav class="nav" id="nav"></nav>
-    <div class="spacer"></div>
-    <div class="sync-pill" id="sync-pill"><span class="dot"></span><span>Loading…</span></div>
-  </aside>
-  <main id="main"></main>
+<body class="k">
+<div class="app" id="app">
+  <aside class="sidebar" id="sidebar" aria-label="Sidebar"></aside>
+  <main class="content" id="content"></main>
+  <nav class="tabbar" id="tabbar" aria-label="Tabs"></nav>
 </div>
-<nav class="tabbar" id="tabbar"></nav>
-<div id="sheet-root"></div>
 <script type="module" src="/app.js"></script>
 </body>
 </html>
